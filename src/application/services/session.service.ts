@@ -391,7 +391,8 @@ export class SessionService implements ISessionService {
 
       return cleanedCount;
     } catch (error) {
-      log.error('Failed to cleanup expired sessions', error as Error);
+      const errorMessage = error instanceof Error ? error : new Error(String(error));
+      log.error('Failed to cleanup expired sessions', errorMessage);
       return 0;
     }
   }
@@ -424,7 +425,8 @@ export class SessionService implements ISessionService {
 
       return cleanedCount;
     } catch (error) {
-      log.error('Failed to cleanup inactive sessions', error as Error);
+      const errorMessage = error instanceof Error ? error : new Error(String(error));
+      log.error('Failed to cleanup inactive sessions', errorMessage);
       return 0;
     }
   }
