@@ -17,7 +17,9 @@ export class User {
   mfaSecret: string | null;
   mfaBackupCodes: string[] | null;
   accountLocked: boolean;
+  accountLockedUntil: Date | null;
   failedLoginAttempts: number;
+  lastFailedLoginAt: Date | null;
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;

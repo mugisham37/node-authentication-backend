@@ -124,7 +124,10 @@
 
 ## Phase 4: Application Layer - Authentication Services
 
-- [ ] 4. Implement authentication service
+- [-] 4. Implement authentication service
+
+
+
   - Create IAuthenticationService interface
   - Implement user registration logic
   - Implement email/password login logic
@@ -154,7 +157,8 @@
   - **Property 10: Locked account rejection**
   - **Validates: Requirements 3.1, 3.2, 3.3**
 
-- [ ] 4.5 Implement account lockout logic
+- [-] 4.5 Implement account lockout logic
+
   - Track failed login attempts
   - Lock account after threshold
   - Implement temporary lockout with expiration
