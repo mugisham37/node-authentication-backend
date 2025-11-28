@@ -2,15 +2,16 @@ import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ApplicationError } from '../types/application-error.js';
 import { log } from '../../logging/logger.js';
 
-export async function errorHandler(
-  error: FastifyError | Error,
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
-  const requestId = request.id;
-  const userId = (request as any).user?.id;
+interface RequestWithUser extends FastifyRequest {
+  user?: { id: string };
+}
 
-  // Log error with full context
+function logErrorContext(
+  error: Error,
+  requestId: string,
+  userId: string | undefined,
+  request: FastifyRequest
+): void {
   log.error('Request error', error, {
     requestId,
     userId,
@@ -21,34 +22,51 @@ export async function errorHandler(
       body: request.body,
     },
   });
+}
 
-  // Handle ApplicationError instances
-  if (error instanceof ApplicationError) {
-    // Send to monitoring system for non-operational errors
-    if (!error.isOperational) {
-      log.security('Non-operational error occurred', {
-        requestId,
-        error: {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        },
-      });
-    }
-
-    return reply.status(error.statusCode).send({
+async function handleApplicationError(
+  error: ApplicationError,
+  requestId: string,
+  reply: FastifyReply
+): Promise<void> {
+  if (!error.isOperational) {
+    log.security('Non-operational error occurred', {
+      requestId,
       error: {
-        type: error.name,
+        name: error.name,
         message: error.message,
-        details: error.details,
-        requestId,
+        stack: error.stack,
       },
     });
   }
 
-  // Handle Fastify validation errors
+  await reply.status(error.statusCode).send({
+    error: {
+      type: error.name,
+      message: error.message,
+      details: error.details,
+      requestId,
+    },
+  });
+}
+
+export async function errorHandler(
+  error: FastifyError | Error,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const requestId = request.id;
+  const userId = (request as RequestWithUser).user?.id;
+
+  logErrorContext(error, requestId, userId, request);
+
+  if (error instanceof ApplicationError) {
+    await handleApplicationError(error, requestId, reply);
+    return;
+  }
+
   if ('validation' in error && error.validation) {
-    return reply.status(400).send({
+    await reply.status(400).send({
       error: {
         type: 'ValidationError',
         message: error.message,
@@ -56,10 +74,10 @@ export async function errorHandler(
         requestId,
       },
     });
+    return;
   }
 
-  // Unknown error - hide details from client
-  return reply.status(500).send({
+  await reply.status(500).send({
     error: {
       type: 'InternalServerError',
       message: 'An unexpected error occurred',

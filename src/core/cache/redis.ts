@@ -81,7 +81,7 @@ export async function initializeRedis(): Promise<void> {
       await redis.ping();
     }
   } catch (error) {
-    log.error('Failed to initialize Redis connection', error);
+    log.error('Failed to initialize Redis connection', error as Error);
     throw error;
   }
 }
@@ -118,7 +118,7 @@ export async function get<T = string>(key: string): Promise<T | null> {
     return null;
   } catch (error) {
     cacheOperations.inc({ operation: 'get', status: 'error' });
-    log.error('Redis GET error', error, { key });
+    log.error('Redis GET error', error as Error, { key });
     throw error;
   }
 }
@@ -141,7 +141,7 @@ export async function set(key: string, value: unknown, ttlSeconds?: number): Pro
     cacheOperations.inc({ operation: 'set', status: 'success' });
   } catch (error) {
     cacheOperations.inc({ operation: 'set', status: 'error' });
-    log.error('Redis SET error', error, { key });
+    log.error('Redis SET error', error as Error, { key });
     throw error;
   }
 }
@@ -157,7 +157,7 @@ export async function del(key: string): Promise<void> {
     cacheOperations.inc({ operation: 'del', status: 'success' });
   } catch (error) {
     cacheOperations.inc({ operation: 'del', status: 'error' });
-    log.error('Redis DEL error', error, { key });
+    log.error('Redis DEL error', error as Error, { key });
     throw error;
   }
 }
@@ -176,7 +176,7 @@ export async function delPattern(pattern: string): Promise<void> {
     cacheOperations.inc({ operation: 'del_pattern', status: 'success' });
   } catch (error) {
     cacheOperations.inc({ operation: 'del_pattern', status: 'error' });
-    log.error('Redis DEL pattern error', error, { pattern });
+    log.error('Redis DEL pattern error', error as Error, { pattern });
     throw error;
   }
 }
@@ -191,7 +191,7 @@ export async function exists(key: string): Promise<boolean> {
     const result = await client.exists(key);
     return result === 1;
   } catch (error) {
-    log.error('Redis EXISTS error', error, { key });
+    log.error('Redis EXISTS error', error as Error, { key });
     throw error;
   }
 }
@@ -205,7 +205,7 @@ export async function expire(key: string, ttlSeconds: number): Promise<void> {
   try {
     await client.expire(key, ttlSeconds);
   } catch (error) {
-    log.error('Redis EXPIRE error', error, { key, ttlSeconds });
+    log.error('Redis EXPIRE error', error as Error, { key, ttlSeconds });
     throw error;
   }
 }
@@ -222,7 +222,7 @@ export async function incr(key: string): Promise<number> {
     return result;
   } catch (error) {
     cacheOperations.inc({ operation: 'incr', status: 'error' });
-    log.error('Redis INCR error', error, { key });
+    log.error('Redis INCR error', error as Error, { key });
     throw error;
   }
 }
@@ -239,7 +239,7 @@ export async function decr(key: string): Promise<number> {
     return result;
   } catch (error) {
     cacheOperations.inc({ operation: 'decr', status: 'error' });
-    log.error('Redis DECR error', error, { key });
+    log.error('Redis DECR error', error as Error, { key });
     throw error;
   }
 }
@@ -256,7 +256,7 @@ export async function sadd(key: string, ...members: string[]): Promise<number> {
     return result;
   } catch (error) {
     cacheOperations.inc({ operation: 'sadd', status: 'error' });
-    log.error('Redis SADD error', error, { key });
+    log.error('Redis SADD error', error as Error, { key });
     throw error;
   }
 }
@@ -271,7 +271,7 @@ export async function sismember(key: string, member: string): Promise<boolean> {
     const result = await client.sismember(key, member);
     return result === 1;
   } catch (error) {
-    log.error('Redis SISMEMBER error', error, { key, member });
+    log.error('Redis SISMEMBER error', error as Error, { key, member });
     throw error;
   }
 }
@@ -285,7 +285,7 @@ export async function smembers(key: string): Promise<string[]> {
   try {
     return await client.smembers(key);
   } catch (error) {
-    log.error('Redis SMEMBERS error', error, { key });
+    log.error('Redis SMEMBERS error', error as Error, { key });
     throw error;
   }
 }

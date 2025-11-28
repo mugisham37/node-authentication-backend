@@ -21,7 +21,7 @@ export async function initializeDatabase(): Promise<void> {
 
     log.info('Database and cache connections initialized successfully');
   } catch (error) {
-    log.error('Failed to initialize database and cache connections', error);
+    log.error('Failed to initialize database and cache connections', error as Error);
     throw error;
   }
 }
@@ -37,7 +37,7 @@ export async function closeDatabase(): Promise<void> {
 
     log.info('Database and cache connections closed successfully');
   } catch (error) {
-    log.error('Failed to close database and cache connections', error);
+    log.error('Failed to close database and cache connections', error as Error);
     throw error;
   }
 }

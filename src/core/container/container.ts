@@ -4,8 +4,8 @@ import type { AwilixContainer } from 'awilix';
 // Define container interface for type safety
 export interface DIContainer {
   // Database
-  db: any;
-  redis: any;
+  db: unknown;
+  redis: unknown;
 
   // Repositories (will be registered with SCOPED lifetime)
   // userRepository: IUserRepository;
@@ -117,7 +117,7 @@ export function getContainer(): AwilixContainer<DIContainer> {
  */
 export function resetContainer(): void {
   if (containerInstance) {
-    containerInstance.dispose();
+    void containerInstance.dispose();
     containerInstance = null;
   }
 }

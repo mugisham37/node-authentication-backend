@@ -16,7 +16,7 @@ export interface HealthCheck {
   status: 'up' | 'down';
   responseTime?: number;
   error?: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 /**

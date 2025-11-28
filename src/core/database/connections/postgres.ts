@@ -53,7 +53,7 @@ export async function initializePostgres(): Promise<void> {
       maxConnections: databaseConfig.max,
     });
   } catch (error) {
-    log.error('Failed to initialize PostgreSQL connection pool', error);
+    log.error('Failed to initialize PostgreSQL connection pool', error as Error);
     throw error;
   }
 }

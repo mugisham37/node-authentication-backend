@@ -4,33 +4,32 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 
 let sdk: NodeSDK | null = null;
 
-/**
- * Initialize OpenTelemetry tracing
- */
 export function initializeTracing(): void {
   if (sdk) {
-    return; // Already initialized
+    return;
   }
 
-  sdk = new NodeSDK({
-    resourceDetectors: [],
-    serviceName: 'enterprise-auth-system',
-    instrumentations: [
-      getNodeAutoInstrumentations({
-        // Disable instrumentations that are not needed
-        '@opentelemetry/instrumentation-fs': {
-          enabled: false,
-        },
-      }),
-    ],
-  });
+  try {
+    sdk = new NodeSDK({
+      resourceDetectors: [],
+      serviceName: 'enterprise-auth-system',
+      instrumentations: [
+        getNodeAutoInstrumentations({
+          '@opentelemetry/instrumentation-fs': {
+            enabled: false,
+          },
+        }),
+      ],
+    });
 
-  sdk.start();
+    sdk.start();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (error) {
+    // Silently fail if tracing cannot be initialized
+    sdk = null;
+  }
 }
 
-/**
- * Shutdown tracing gracefully
- */
 export async function shutdownTracing(): Promise<void> {
   if (sdk) {
     await sdk.shutdown();
@@ -38,80 +37,76 @@ export async function shutdownTracing(): Promise<void> {
   }
 }
 
-/**
- * Get the tracer instance
- */
-export function getTracer() {
+export function getTracer(): ReturnType<typeof trace.getTracer> {
   return trace.getTracer('enterprise-auth-system');
 }
 
-/**
- * Create a new span for an operation
- */
-export function startSpan(name: string, attributes?: Record<string, any>): Span {
+export function startSpan(name: string, attributes?: Record<string, unknown>): Span {
   const tracer = getTracer();
   return tracer.startSpan(name, {
-    attributes,
+    attributes: attributes as Record<string, string | number | boolean>,
   });
 }
 
-/**
- * Execute a function within a span context
- */
 export async function withSpan<T>(
   name: string,
   fn: (span: Span) => Promise<T>,
-  attributes?: Record<string, any>
+  attributes?: Record<string, unknown>
 ): Promise<T> {
   const tracer = getTracer();
 
-  return tracer.startActiveSpan(name, { attributes }, async (span) => {
-    try {
-      const result = await fn(span);
-      span.setStatus({ code: SpanStatusCode.OK });
-      return result;
-    } catch (error) {
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : 'Unknown error',
-      });
+  return tracer.startActiveSpan(
+    name,
+    { attributes: attributes as Record<string, string | number | boolean> },
+    async (span) => {
+      try {
+        const result = await fn(span);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
 
-      if (error instanceof Error) {
-        span.recordException(error);
+        if (error instanceof Error) {
+          span.recordException(error);
+        }
+
+        throw error;
+      } finally {
+        span.end();
       }
-
-      throw error;
-    } finally {
-      span.end();
     }
-  });
+  );
 }
 
-/**
- * Add attributes to the current span
- */
-export function addSpanAttributes(attributes: Record<string, any>): void {
+export function addSpanAttributes(attributes: Record<string, unknown>): void {
   const span = trace.getActiveSpan();
   if (span) {
     Object.entries(attributes).forEach(([key, value]) => {
-      span.setAttribute(key, value);
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        span.setAttribute(key, value);
+      }
     });
   }
 }
 
-/**
- * Add an event to the current span
- */
 export function addSpanEvent(name: string, attributes?: Record<string, unknown>): void {
   const span = trace.getActiveSpan();
   if (span) {
-    span.addEvent(name, attributes);
+    const validAttributes: Record<string, string | number | boolean> = {};
+    if (attributes) {
+      Object.entries(attributes).forEach(([key, value]) => {
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          validAttributes[key] = value;
+        }
+      });
+    }
+    span.addEvent(name, validAttributes);
   }
 }
 
-/**
- * Record an exception in the current span
- */
 export function recordSpanException(error: Error): void {
   const span = trace.getActiveSpan();
   if (span) {
