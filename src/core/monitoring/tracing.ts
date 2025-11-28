@@ -14,6 +14,7 @@ export function initializeTracing(): void {
       resourceDetectors: [],
       serviceName: 'enterprise-auth-system',
       instrumentations: [
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         getNodeAutoInstrumentations({
           '@opentelemetry/instrumentation-fs': {
             enabled: false,
@@ -22,6 +23,7 @@ export function initializeTracing(): void {
       ],
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     sdk.start();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {

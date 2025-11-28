@@ -65,7 +65,7 @@ export async function initializeRedis(): Promise<void> {
         log.info('Redis client ready');
       });
 
-      redis.on('error', (err) => {
+      redis.on('error', (err: Error) => {
         log.error('Redis client error', err);
       });
 

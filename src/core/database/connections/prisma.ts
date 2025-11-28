@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { log } from '../../logging/logger.js';
 
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
 let prisma: PrismaClient | null = null;
 
 export function initializePrisma(): PrismaClient {
