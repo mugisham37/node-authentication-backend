@@ -75,7 +75,12 @@
 
 ## Phase 3: Domain Layer
 
-- [-] 3. Implement core domain entities
+- [x] 3. Implement core domain entities
+
+
+
+
+
 
 
 
@@ -109,7 +114,9 @@
   - Test value object validation and behavior
   - _Requirements: 1.1, 3.1, 11.1_
 
-- [ ] 3.4 Implement domain events
+- [x] 3.4 Implement domain events
+
+
   - Create event emitter infrastructure
   - Define domain events (UserRegistered, UserLoggedIn, PasswordChanged, etc.)
   - Implement event publishing mechanism

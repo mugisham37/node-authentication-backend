@@ -12,7 +12,9 @@ export class PhoneNumber {
   constructor(phoneNumber: string) {
     const normalized = this.normalize(phoneNumber);
     if (!this.isValidE164(normalized)) {
-      throw new ValidationError('Invalid phone number format. Must be in E.164 format (+[country code][number])');
+      throw new ValidationError(
+        'Invalid phone number format. Must be in E.164 format (+[country code][number])'
+      );
     }
     this.value = normalized;
   }
