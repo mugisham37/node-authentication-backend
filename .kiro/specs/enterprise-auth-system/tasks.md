@@ -183,7 +183,9 @@
 
 ## Phase 5: Application Layer - MFA Services
 
-- [-] 5. Implement MFA service
+- [x] 5. Implement MFA service
+
+
 
 
 
@@ -229,7 +231,10 @@
 
 ## Phase 6: Application Layer - Token & Session Services
 
-- [ ] 6. Implement token service
+- [-] 6. Implement token service
+
+
+
   - Create ITokenService interface
   - Implement JWT access token generation with RS256
   - Implement refresh token generation with crypto
@@ -248,7 +253,8 @@
   - **Property 29: Token reuse revokes family**
   - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7**
 
-- [ ] 6.2 Implement session management service
+- [-] 6.2 Implement session management service
+
   - Create ISessionService interface
   - Implement session creation with metadata
   - Implement session listing for user
