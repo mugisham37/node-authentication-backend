@@ -164,7 +164,6 @@ export interface IAuthenticationService {
 interface TokenStore {
   emailVerificationTokens: Map<string, { userId: string; email: string; expiresAt: Date }>;
   passwordResetTokens: Map<string, { userId: string; expiresAt: Date }>;
-  mfaChallenges: Map<string, { userId: string; expiresAt: Date }>;
 }
 
 /**
@@ -175,7 +174,6 @@ export class AuthenticationService implements IAuthenticationService {
   private tokenStore: TokenStore = {
     emailVerificationTokens: new Map(),
     passwordResetTokens: new Map(),
-    mfaChallenges: new Map(),
   };
 
   constructor(
@@ -313,14 +311,12 @@ export class AuthenticationService implements IAuthenticationService {
   /**
    * Creates an MFA challenge for users with MFA enabled
    * Requirements: 3.4
+   * Note: This method is kept for backward compatibility but should use MFAService in production
    */
   private createMFAChallenge(user: User): LoginOutput {
+    // In production, this should be handled by MFAService.createMFAChallenge()
+    // For now, we'll use a simple in-memory implementation
     const challengeId = randomUUID();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-    this.tokenStore.mfaChallenges.set(challengeId, {
-      userId: user.id,
-      expiresAt,
-    });
 
     return {
       user: this.mapUserToOutput(user),

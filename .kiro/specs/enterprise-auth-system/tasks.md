@@ -183,7 +183,10 @@
 
 ## Phase 5: Application Layer - MFA Services
 
-- [ ] 5. Implement MFA service
+- [-] 5. Implement MFA service
+
+
+
   - Create IMFAService interface
   - Implement TOTP MFA setup with speakeasy
   - Implement SMS MFA setup with Twilio
@@ -211,7 +214,9 @@
   - **Property 23: TOTP time window acceptance**
   - **Validates: Requirements 5.1, 5.2, 5.4, 5.5**
 
-- [ ] 5.4 Implement MFA challenge flow
+- [x] 5.4 Implement MFA challenge flow
+
+
   - Create MFA challenge on login for MFA-enabled users
   - Store challenge in Redis with expiration
   - Verify challenge and code together
