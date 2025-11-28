@@ -13,12 +13,13 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../core/errors/types/application-error.js';
-import {
-  UserRegisteredEvent,
-  UserLoggedInEvent,
-  EmailVerifiedEvent,
-  PasswordChangedEvent,
-} from '../../domain/events/user-events.js';
+// Domain events - to be emitted via event bus in production
+// import {
+//   UserRegisteredEvent,
+//   UserLoggedInEvent,
+//   EmailVerifiedEvent,
+//   PasswordChangedEvent,
+// } from '../../domain/events/user-events.js';
 
 /**
  * Input for user registration
@@ -53,7 +54,6 @@ export interface RegisterOutput {
 export interface LoginInput {
   email: string;
   password: string;
-  deviceFingerprint: string;
   deviceName: string;
   ipAddress: string;
   userAgent: string;
@@ -246,59 +246,12 @@ export class AuthenticationService implements IAuthenticationService {
    * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
    */
   async login(input: LoginInput): Promise<LoginOutput> {
-    // Find user by email
-    const email = new Email(input.email);
-    const user = await this.userRepository.findByEmail(email.toString());
-
-    // Check if user exists (Requirement 3.2)
-    if (!user) {
-      throw new AuthenticationError('Invalid email or password');
-    }
-
-    // Check if account is locked (Requirement 3.3)
-    if (user.accountLocked) {
-      throw new AuthenticationError('Account is locked due to multiple failed login attempts');
-    }
-
-    // Verify password (Requirement 3.5)
-    const password = new Password(input.password);
-    const isValidPassword = await user.verifyPassword(password);
-
-    if (!isValidPassword) {
-      // Increment failed attempts and potentially lock account (Requirement 3.6)
-      user.incrementFailedAttempts();
-      await this.userRepository.update(user);
-
-      throw new AuthenticationError('Invalid email or password');
-    }
-
-    // Reset failed attempts on successful login
-    user.resetFailedAttempts();
-    user.updateLastLogin();
-    await this.userRepository.update(user);
+    // Find and validate user
+    const user = await this.validateUserCredentials(input.email, input.password);
 
     // Check if MFA is enabled (Requirement 3.4)
     if (user.hasMFAEnabled()) {
-      // Generate MFA challenge
-      const challengeId = randomUUID();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
-      this.tokenStore.mfaChallenges.set(challengeId, {
-        userId: user.id,
-        expiresAt,
-      });
-
-      return {
-        user: {
-          id: user.id,
-          email: user.email.toString(),
-          name: user.name,
-          image: user.image,
-          emailVerified: user.emailVerified,
-          mfaEnabled: user.mfaEnabled,
-        },
-        mfaChallengeId: challengeId,
-        requiresMFA: true,
-      };
+      return this.createMFAChallenge(user);
     }
 
     // Create session (Requirement 3.7)
@@ -308,19 +261,85 @@ export class AuthenticationService implements IAuthenticationService {
     // new UserLoggedInEvent(user.id, session.id, input.ipAddress, input.userAgent);
 
     return {
-      user: {
-        id: user.id,
-        email: user.email.toString(),
-        name: user.name,
-        image: user.image,
-        emailVerified: user.emailVerified,
-        mfaEnabled: user.mfaEnabled,
-      },
+      user: this.mapUserToOutput(user),
       session: {
         id: session.id,
         expiresAt: session.expiresAt,
       },
       requiresMFA: false,
+    };
+  }
+
+  /**
+   * Validates user credentials and handles failed attempts
+   * Requirements: 3.2, 3.3, 3.5, 3.6
+   */
+  private async validateUserCredentials(email: string, password: string): Promise<User> {
+    // Find user by email
+    const emailObj = new Email(email);
+    const user = await this.userRepository.findByEmail(emailObj.toString());
+
+    // Check if user exists (Requirement 3.2)
+    if (!user) {
+      throw new AuthenticationError('Invalid email or password');
+    }
+
+    // Check if account is locked (Requirement 3.3, 3.6)
+    if (user.isAccountLocked()) {
+      throw new AuthenticationError(
+        'Account is temporarily locked due to multiple failed login attempts. Please try again later.'
+      );
+    }
+
+    // Verify password (Requirement 3.5)
+    const passwordObj = new Password(password);
+    const isValidPassword = await user.verifyPassword(passwordObj);
+
+    if (!isValidPassword) {
+      // Increment failed attempts and potentially lock account (Requirement 3.6)
+      user.incrementFailedAttempts();
+      await this.userRepository.update(user);
+      throw new AuthenticationError('Invalid email or password');
+    }
+
+    // Reset failed attempts on successful login
+    user.resetFailedAttempts();
+    user.updateLastLogin();
+    await this.userRepository.update(user);
+
+    return user;
+  }
+
+  /**
+   * Creates an MFA challenge for users with MFA enabled
+   * Requirements: 3.4
+   */
+  private createMFAChallenge(user: User): LoginOutput {
+    const challengeId = randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    this.tokenStore.mfaChallenges.set(challengeId, {
+      userId: user.id,
+      expiresAt,
+    });
+
+    return {
+      user: this.mapUserToOutput(user),
+      mfaChallengeId: challengeId,
+      requiresMFA: true,
+    };
+  }
+
+  /**
+   * Maps User entity to output format
+   */
+  private mapUserToOutput(user: User): LoginOutput['user'] {
+    return {
+      id: user.id,
+      email: user.email.toString(),
+      name: user.name,
+      image: user.image,
+      emailVerified: user.emailVerified,
+      mfaEnabled: user.mfaEnabled,
     };
   }
 
@@ -452,7 +471,9 @@ export class AuthenticationService implements IAuthenticationService {
    */
   private async createSession(userId: string, input: LoginInput): Promise<Session> {
     // Create device fingerprint and IP address value objects
-    const deviceFingerprint = new DeviceFingerprint(input.deviceFingerprint);
+    const deviceFingerprint = new DeviceFingerprint({
+      userAgent: input.userAgent,
+    });
     const ipAddress = new IPAddress(input.ipAddress);
 
     // Generate token hash (in production, this would be a hash of the refresh token)

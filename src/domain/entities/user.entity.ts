@@ -37,7 +37,9 @@ export class User {
     mfaSecret?: string | null;
     mfaBackupCodes?: string[] | null;
     accountLocked?: boolean;
+    accountLockedUntil?: Date | null;
     failedLoginAttempts?: number;
+    lastFailedLoginAt?: Date | null;
     lastLoginAt?: Date | null;
     createdAt?: Date;
     updatedAt?: Date;
@@ -54,7 +56,9 @@ export class User {
     this.mfaSecret = props.mfaSecret ?? null;
     this.mfaBackupCodes = props.mfaBackupCodes ?? null;
     this.accountLocked = props.accountLocked ?? false;
+    this.accountLockedUntil = props.accountLockedUntil ?? null;
     this.failedLoginAttempts = props.failedLoginAttempts ?? 0;
+    this.lastFailedLoginAt = props.lastFailedLoginAt ?? null;
     this.lastLoginAt = props.lastLoginAt ?? null;
     this.createdAt = props.createdAt ?? new Date();
     this.updatedAt = props.updatedAt ?? new Date();
@@ -74,11 +78,12 @@ export class User {
   }
 
   /**
-   * Locks the user account
-   * Requirement: 3.3, 3.6
+   * Locks the user account temporarily
+   * Requirement: 3.3, 3.6 - Lock account after 5 failed attempts within 15 minutes
    */
-  lockAccount(): void {
+  lockAccount(durationMinutes: number = 15): void {
     this.accountLocked = true;
+    this.accountLockedUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
     this.updatedAt = new Date();
   }
 
@@ -87,20 +92,55 @@ export class User {
    */
   unlockAccount(): void {
     this.accountLocked = false;
+    this.accountLockedUntil = null;
     this.failedLoginAttempts = 0;
+    this.lastFailedLoginAt = null;
     this.updatedAt = new Date();
   }
 
   /**
+   * Checks if account is currently locked
+   * Automatically unlocks if temporary lock has expired
+   * Requirement: 3.6
+   */
+  isAccountLocked(): boolean {
+    if (!this.accountLocked) {
+      return false;
+    }
+
+    // Check if temporary lock has expired
+    if (this.accountLockedUntil && new Date() > this.accountLockedUntil) {
+      this.unlockAccount();
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Increments failed login attempts and locks account if threshold reached
-   * Requirement: 3.6 - Lock account after 5 failed attempts
+   * Requirement: 3.6 - Lock account after 5 failed attempts within 15 minutes
    */
   incrementFailedAttempts(): void {
-    this.failedLoginAttempts++;
-    this.updatedAt = new Date();
+    const now = new Date();
 
+    // Check if last failed attempt was more than 15 minutes ago
+    if (this.lastFailedLoginAt) {
+      const minutesSinceLastFail = (now.getTime() - this.lastFailedLoginAt.getTime()) / (1000 * 60);
+
+      // Reset counter if more than 15 minutes have passed
+      if (minutesSinceLastFail > 15) {
+        this.failedLoginAttempts = 0;
+      }
+    }
+
+    this.failedLoginAttempts++;
+    this.lastFailedLoginAt = now;
+    this.updatedAt = now;
+
+    // Lock account after 5 failed attempts within 15 minutes
     if (this.failedLoginAttempts >= 5) {
-      this.lockAccount();
+      this.lockAccount(15); // Lock for 15 minutes
     }
   }
 
@@ -109,6 +149,7 @@ export class User {
    */
   resetFailedAttempts(): void {
     this.failedLoginAttempts = 0;
+    this.lastFailedLoginAt = null;
     this.updatedAt = new Date();
   }
 

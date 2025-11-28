@@ -124,7 +124,8 @@
 
 ## Phase 4: Application Layer - Authentication Services
 
-- [-] 4. Implement authentication service
+- [x] 4. Implement authentication service
+
 
 
 
@@ -157,7 +158,8 @@
   - **Property 10: Locked account rejection**
   - **Validates: Requirements 3.1, 3.2, 3.3**
 
-- [-] 4.5 Implement account lockout logic
+- [x] 4.5 Implement account lockout logic
+
 
   - Track failed login attempts
   - Lock account after threshold
