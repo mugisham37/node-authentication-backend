@@ -10,5 +10,244 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Schema will be defined in later tasks
-// This file is created as part of project initialization
+model User {
+  id                   String    @id @default(uuid()) @db.Uuid
+  email                String    @unique @db.VarChar(255)
+  passwordHash         String?   @map("password_hash") @db.VarChar(255)
+  name                 String    @db.VarChar(255)
+  image                String?   @db.VarChar(500)
+  emailVerified        Boolean   @default(false) @map("email_verified")
+  emailVerifiedAt      DateTime? @map("email_verified_at") @db.Timestamp
+  mfaEnabled           Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret            String?   @map("mfa_secret") @db.Text
+  mfaBackupCodes       Json?     @map("mfa_backup_codes") @db.JsonB
+  accountLocked        Boolean   @default(false) @map("account_locked")
+  failedLoginAttempts  Int       @default(0) @map("failed_login_attempts")
+  lastLoginAt          DateTime? @map("last_login_at") @db.Timestamp
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamp
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamp
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamp
+
+  sessions                Session[]
+  oauthAccounts           OAuthAccount[]
+  auditLogs               AuditLog[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
+  webhooks                Webhook[]
+  devices                 Device[]
+  userRoles               UserRole[]
+  rolesAssigned           UserRole[] @relation("AssignedBy")
+
+  @@index([email, deletedAt])
+  @@index([email, emailVerified, deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@index([name])
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  resource    String   @db.VarChar(100)
+  action      String   @db.VarChar(50)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  rolePermissions RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at") @db.Timestamp
+  assignedBy String?  @map("assigned_by") @db.Uuid
+
+  user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assigner User? @relation("AssignedBy", fields: [assignedBy], references: [id])
+
+  @@id([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String   @map("role_id") @db.Uuid
+  permissionId String   @map("permission_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@map("role_permissions")
+}
+
+model Session {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  tokenHash         String    @unique @map("token_hash") @db.VarChar(255)
+  deviceFingerprint String    @map("device_fingerprint") @db.VarChar(255)
+  deviceName        String?   @map("device_name") @db.VarChar(255)
+  ipAddress         String    @map("ip_address") @db.Inet
+  userAgent         String?   @map("user_agent") @db.Text
+  location          String?   @db.VarChar(255)
+  isTrusted         Boolean   @default(false) @map("is_trusted")
+  trustScore        Int       @default(0) @map("trust_score")
+  lastActivityAt    DateTime  @default(now()) @map("last_activity_at") @db.Timestamp
+  expiresAt         DateTime  @map("expires_at") @db.Timestamp
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp
+  revokedAt         DateTime? @map("revoked_at") @db.Timestamp
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenHash, revokedAt])
+  @@index([expiresAt, revokedAt])
+  @@map("sessions")
+}
+
+model OAuthAccount {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  provider          String    @db.VarChar(50)
+  providerAccountId String    @map("provider_account_id") @db.VarChar(255)
+  accessToken       String?   @map("access_token") @db.Text
+  refreshToken      String?   @map("refresh_token") @db.Text
+  tokenExpiresAt    DateTime? @map("token_expires_at") @db.Timestamp
+  scope             String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamp
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([provider, providerAccountId])
+  @@map("oauth_accounts")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
+  action     String    @db.VarChar(100)
+  resource   String?   @db.VarChar(100)
+  resourceId String?   @map("resource_id") @db.Uuid
+  status     String    @db.VarChar(20)
+  ipAddress  String?   @map("ip_address") @db.Inet
+  userAgent  String?   @map("user_agent") @db.Text
+  metadata   Json?     @db.JsonB
+  riskScore  Int?      @map("risk_score")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamp
+  usedAt    DateTime? @map("used_at") @db.Timestamp
+  ipAddress String?   @map("ip_address") @db.Inet
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash, usedAt])
+  @@index([expiresAt, usedAt])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash") @db.VarChar(255)
+  email      String    @db.VarChar(255)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamp
+  verifiedAt DateTime? @map("verified_at") @db.Timestamp
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash, verifiedAt])
+  @@map("email_verification_tokens")
+}
+
+model Webhook {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  url       String   @db.VarChar(500)
+  events    Json     @db.JsonB
+  secret    String   @db.VarChar(255)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp
+
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId, isActive])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id             String    @id @default(uuid()) @db.Uuid
+  webhookId      String    @map("webhook_id") @db.Uuid
+  eventType      String    @map("event_type") @db.VarChar(100)
+  payload        Json      @db.JsonB
+  status         String    @db.VarChar(20)
+  httpStatusCode Int?      @map("http_status_code")
+  responseBody   String?   @map("response_body") @db.Text
+  attemptCount   Int       @default(0) @map("attempt_count")
+  nextRetryAt    DateTime? @map("next_retry_at") @db.Timestamp
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamp
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([status])
+  @@index([nextRetryAt, status])
+  @@map("webhook_deliveries")
+}
+
+model Device {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  fingerprint String   @unique @db.VarChar(255)
+  name        String?  @db.VarChar(255)
+  type        String?  @db.VarChar(50)
+  isTrusted   Boolean  @default(false) @map("is_trusted")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamp
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([fingerprint])
+  @@map("devices")
+}

@@ -4,12 +4,14 @@ import { config } from 'dotenv';
 config();
 
 export default {
-  schema: './src/infrastructure/database/schema.ts',
-  out: './src/infrastructure/database/migrations',
+  schema: './src/core/database/schema/*.schema.ts',
+  out: './src/core/database/migrations',
   driver: 'pg',
   dbCredentials: {
-    connectionString: process.env.DATABASE_URL || '',
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
+    database: process.env.DB_NAME || 'enterprise_auth',
   },
-  verbose: true,
-  strict: true,
 } satisfies Config;
