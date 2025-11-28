@@ -134,7 +134,7 @@ export class User {
 
   /**
    * Verifies an MFA code against the stored secret
-   * Note: Actual TOTP verification should be done by MFA service
+   * Note: Actual TOTP (Time-based One-Time Password) verification should be done by MFA service
    * Requirement: 5.1, 5.2
    */
   hasMFAEnabled(): boolean {

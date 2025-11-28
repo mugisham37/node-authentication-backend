@@ -26,7 +26,7 @@ export class PhoneNumber {
     if (!phoneNumber || typeof phoneNumber !== 'string') {
       return '';
     }
-    return phoneNumber.replace(/[\s\-\(\)]/g, '');
+    return phoneNumber.replace(/[\s\-()]/g, '');
   }
 
   /**
