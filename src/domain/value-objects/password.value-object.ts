@@ -1,0 +1,75 @@
+import { hash, verify } from '@node-rs/argon2';
+import { ValidationError } from '../../core/errors/types/application-error.js';
+
+/**
+ * Password value object with complexity validation and Argon2id hashing.
+ * Requirements: 1.3, 1.4, 1.7
+ */
+export class Password {
+  private readonly value: string;
+
+  constructor(password: string) {
+    if (!this.meetsComplexityRequirements(password)) {
+      throw new ValidationError(
+        'Password must be at least 8 characters and contain uppercase, lowercase, number, and special character'
+      );
+    }
+    this.value = password;
+  }
+
+  /**
+   * Validates password complexity requirements
+   * - Minimum 8 characters
+   * - At least one uppercase letter
+   * - At least one lowercase letter
+   * - At least one number
+   * - At least one special character
+   */
+  private meetsComplexityRequirements(password: string): boolean {
+    if (!password || typeof password !== 'string') {
+      return false;
+    }
+
+    return (
+      password.length >= 8 &&
+      /[A-Z]/.test(password) &&
+      /[a-z]/.test(password) &&
+      /[0-9]/.test(password) &&
+      /[^A-Za-z0-9]/.test(password)
+    );
+  }
+
+  /**
+   * Hashes the password using Argon2id algorithm
+   * Configuration per Requirement 1.7:
+   * - Algorithm: Argon2id
+   * - Time cost: 2
+   * - Memory cost: 65536 KB (64 MB)
+   * - Parallelism: 1
+   */
+  async hash(): Promise<string> {
+    return hash(this.value, {
+      memoryCost: 65536,
+      timeCost: 2,
+      parallelism: 1,
+    });
+  }
+
+  /**
+   * Verifies a password against a hash using constant-time comparison
+   */
+  async verify(passwordHash: string): Promise<boolean> {
+    try {
+      return await verify(passwordHash, this.value);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Returns the raw password value (use with caution)
+   */
+  getValue(): string {
+    return this.value;
+  }
+}

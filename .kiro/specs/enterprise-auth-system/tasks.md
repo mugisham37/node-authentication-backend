@@ -75,7 +75,10 @@
 
 ## Phase 3: Domain Layer
 
-- [ ] 3. Implement core domain entities
+- [-] 3. Implement core domain entities
+
+
+
   - Create User entity with business methods
   - Create Session entity with trust score calculation
   - Create Role and Permission entities
@@ -85,7 +88,9 @@
   - Create AuditLog entity
   - _Requirements: 1.1, 3.1, 11.1, 15.1, 16.1, 13.1_
 
-- [ ] 3.1 Implement value objects
+- [x] 3.1 Implement value objects
+
+
   - Create Email value object with validation
   - Create Password value object with Argon2id hashing
   - Create PhoneNumber value object with E.164 validation
