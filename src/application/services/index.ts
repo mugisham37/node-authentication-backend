@@ -23,3 +23,19 @@ export {
   type VerifyMFALoginInput,
   type VerifyMFALoginOutput,
 } from './mfa.service.js';
+
+export {
+  TokenService,
+  type ITokenService,
+  type TokenPayload,
+  type TokenPair,
+  type RefreshOutput,
+} from './token.service.js';
+
+export {
+  SessionService,
+  type ISessionService,
+  type CreateSessionInput,
+  type SessionOutput,
+  type SessionListOutput,
+} from './session.service.js';

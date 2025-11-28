@@ -39,4 +39,10 @@ export interface ISessionRepository {
    * Delete all sessions for a user
    */
   deleteByUserId(userId: string): Promise<void>;
+
+  /**
+   * Find all sessions (for cleanup operations)
+   * Requirements: 7.5
+   */
+  findAll(): Promise<Session[]>;
 }

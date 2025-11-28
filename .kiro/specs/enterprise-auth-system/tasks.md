@@ -231,7 +231,9 @@
 
 ## Phase 6: Application Layer - Token & Session Services
 
-- [-] 6. Implement token service
+- [x] 6. Implement token service
+
+
 
 
 
@@ -253,7 +255,8 @@
   - **Property 29: Token reuse revokes family**
   - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7**
 
-- [-] 6.2 Implement session management service
+- [x] 6.2 Implement session management service
+
 
   - Create ISessionService interface
   - Implement session creation with metadata
