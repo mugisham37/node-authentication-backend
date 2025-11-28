@@ -129,6 +129,7 @@
 
 
 
+
   - Create IAuthenticationService interface
   - Implement user registration logic
   - Implement email/password login logic
