@@ -140,76 +140,33 @@ export class RiskAssessmentService implements IRiskAssessmentService {
     const factors: string[] = [];
     const alerts: SecurityAlert[] = [];
 
-    // Count recent failed attempts (Requirement: 18.1)
-    const recentFailures = previousAttempts.filter(
-      (attempt) => !attempt.success && Date.now() - attempt.timestamp.getTime() < 15 * 60 * 1000
+    // Assess failed login attempts
+    const failedAttempts = this.assessFailedAttempts(userId, previousAttempts, factors, alerts);
+
+    // Assess location risks
+    const { isNewLocation, isImpossibleTravel } = this.assessLocationRisks(
+      userId,
+      location,
+      previousAttempts,
+      factors,
+      alerts
     );
-    const failedAttempts = recentFailures.length;
 
-    if (failedAttempts >= 3) {
-      factors.push(`${failedAttempts} failed login attempts in last 15 minutes`);
-      alerts.push(
-        this.createAlert(userId, 'failed_login_pattern', 'high', {
-          failedAttempts,
-          timeWindow: '15 minutes',
-        })
-      );
-    }
+    // Assess device and velocity
+    const { isNewDevice, velocityScore } = this.assessDeviceAndVelocity(
+      userId,
+      deviceFingerprint,
+      previousAttempts,
+      factors
+    );
 
-    // Check for unusual location (Requirement: 18.2)
-    const isNewLocation = this.isUnusualLocation(location, previousAttempts);
-    if (isNewLocation && location) {
-      factors.push(`Login from new location: ${location}`);
-      alerts.push(this.createAlert(userId, 'unusual_location', 'medium', { location }));
-    }
-
-    // Check for impossible travel (Requirement: 18.3)
-    const lastSuccessfulAttempt = previousAttempts
-      .filter((a) => a.success)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
-
-    const isImpossibleTravel = lastSuccessfulAttempt
-      ? this.detectImpossibleTravel(
-          location,
-          lastSuccessfulAttempt.location,
-          Date.now() - lastSuccessfulAttempt.timestamp.getTime()
-        )
-      : false;
-
-    if (isImpossibleTravel) {
-      factors.push('Impossible travel detected');
-      alerts.push(
-        this.createAlert(userId, 'impossible_travel', 'critical', {
-          currentLocation: location,
-          previousLocation: lastSuccessfulAttempt?.location,
-          timeDifference: Date.now() - (lastSuccessfulAttempt?.timestamp.getTime() || 0),
-        })
-      );
-    }
-
-    // Check if device is known
-    const knownFingerprints = previousAttempts
-      .filter((a) => a.deviceFingerprint)
-      .map((a) => a.deviceFingerprint?.toString() || '');
-    const isNewDevice = !this.isKnownDevice(deviceFingerprint, knownFingerprints);
-
-    if (isNewDevice) {
-      factors.push('Login from new device');
-    }
-
-    // Check velocity (Requirement: 18.1)
-    const velocityScore = this.checkVelocity(userId, previousAttempts, 60 * 60 * 1000); // 1 hour
-    if (velocityScore > 0.7) {
-      factors.push('High velocity of login attempts detected');
-    }
-
-    // Check IP reputation (Requirement: 18.5)
+    // Check IP reputation
     const ipReputationScore = await this.checkIPReputation(ipAddress);
     if (ipReputationScore > 0.5) {
       factors.push('IP address has poor reputation');
     }
 
-    // Calculate composite risk score (Requirement: 18.5)
+    // Calculate final risk score
     const riskScore = this.calculateCompositeRiskScore({
       failedAttempts,
       isNewLocation,
@@ -219,10 +176,7 @@ export class RiskAssessmentService implements IRiskAssessmentService {
       velocityScore,
     });
 
-    // Determine risk level
     const riskLevel = this.getRiskLevel(riskScore);
-
-    // Determine if step-up authentication is required (Requirement: 18.5)
     const requiresStepUp = riskScore >= this.STEP_UP_THRESHOLD;
 
     log.info('Risk assessment completed', {
@@ -234,13 +188,7 @@ export class RiskAssessmentService implements IRiskAssessmentService {
       alertCount: alerts.length,
     });
 
-    return {
-      riskScore,
-      riskLevel,
-      factors,
-      requiresStepUp,
-      alerts,
-    };
+    return { riskScore, riskLevel, factors, requiresStepUp, alerts };
   }
 
   /**
