@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
-import { SocketStream } from '@fastify/websocket';
+import type WebSocket from 'ws';
 import { connectionManager } from './connection-manager.js';
 import { authenticateWebSocket, sendErrorAndClose } from './websocket-auth.js';
 import { logger } from '../../core/logging/logger.js';
@@ -8,10 +8,10 @@ import { logger } from '../../core/logging/logger.js';
  * Sets up WebSocket routes and handlers
  * Requirement: 17.4
  */
-export async function setupWebSocketRoutes(app: FastifyInstance): Promise<void> {
+export function setupWebSocketRoutes(app: FastifyInstance): void {
   // WebSocket endpoint for real-time notifications
-  app.get('/ws', { websocket: true }, async (socket: SocketStream, request: FastifyRequest) => {
-    await handleWebSocketConnection(socket, request);
+  app.get('/ws', { websocket: true }, (socket: WebSocket, request: FastifyRequest) => {
+    handleWebSocketConnection(socket, request);
   });
 
   logger.info('WebSocket routes registered');
@@ -20,19 +20,33 @@ export async function setupWebSocketRoutes(app: FastifyInstance): Promise<void> 
 /**
  * Handles a new WebSocket connection
  */
-async function handleWebSocketConnection(
-  socket: SocketStream,
-  request: FastifyRequest
-): Promise<void> {
+function handleWebSocketConnection(socket: WebSocket, request: FastifyRequest): void {
   // Authenticate the connection
-  const payload = await authenticateWebSocket(request);
+  authenticateWebSocket(request)
+    .then((payload) => {
+      if (!payload) {
+        sendErrorAndClose(socket, 'Authentication failed');
+        return;
+      }
 
-  if (!payload) {
-    sendErrorAndClose(socket, 'Authentication failed');
-    return;
-  }
+      const { userId, sessionId } = payload;
+      setupConnection(socket, request, userId, sessionId);
+    })
+    .catch((error) => {
+      logger.error('WebSocket authentication error', { error });
+      sendErrorAndClose(socket, 'Authentication failed');
+    });
+}
 
-  const { userId, sessionId } = payload;
+/**
+ * Sets up an authenticated WebSocket connection
+ */
+function setupConnection(
+  socket: WebSocket,
+  request: FastifyRequest,
+  userId: string,
+  sessionId: string
+): void {
 
   // Add connection to manager
   connectionManager.addConnection(userId, sessionId, socket);
@@ -47,10 +61,10 @@ async function handleWebSocketConnection(
   );
 
   // Handle incoming messages
-  socket.on('message', async (data: Buffer) => {
+  socket.on('message', (data: Buffer) => {
     try {
       const message = JSON.parse(data.toString());
-      await handleIncomingMessage(userId, sessionId, message, socket);
+      handleIncomingMessage(userId, sessionId, message, socket);
     } catch (error) {
       logger.error('Error handling WebSocket message', {
         userId,
@@ -82,12 +96,12 @@ async function handleWebSocketConnection(
 /**
  * Handles incoming WebSocket messages from clients
  */
-async function handleIncomingMessage(
+function handleIncomingMessage(
   userId: string,
   sessionId: string,
-  message: any,
-  socket: SocketStream
-): Promise<void> {
+  message: { type: string; payload?: { channel?: string } },
+  socket: WebSocket
+): void {
   const { type, payload } = message;
 
   switch (type) {
@@ -102,19 +116,65 @@ async function handleIncomingMessage(
       break;
 
     case 'subscribe':
-      // Handle subscription to specific event types (future enhancement)
-      logger.info('WebSocket subscription request', {
-        userId,
-        sessionId,
-        payload,
-      });
-      socket.send(
-        JSON.stringify({
-          type: 'subscribed',
-          payload,
-          timestamp: new Date().toISOString(),
-        })
-      );
+      // Handle subscription to specific channels
+      if (payload && payload.channel) {
+        const success = connectionManager.subscribeToChannel(socket, payload.channel);
+        socket.send(
+          JSON.stringify({
+            type: success ? 'subscribed' : 'error',
+            message: success
+              ? `Subscribed to channel: ${payload.channel}`
+              : 'Failed to subscribe to channel',
+            channel: payload.channel,
+            timestamp: new Date().toISOString(),
+          })
+        );
+        logger.info('WebSocket subscription request', {
+          userId,
+          sessionId,
+          channel: payload.channel,
+          success,
+        });
+      } else {
+        socket.send(
+          JSON.stringify({
+            type: 'error',
+            message: 'Channel name is required for subscription',
+            timestamp: new Date().toISOString(),
+          })
+        );
+      }
+      break;
+
+    case 'unsubscribe':
+      // Handle unsubscription from specific channels
+      if (payload && payload.channel) {
+        const success = connectionManager.unsubscribeFromChannel(socket, payload.channel);
+        socket.send(
+          JSON.stringify({
+            type: success ? 'unsubscribed' : 'error',
+            message: success
+              ? `Unsubscribed from channel: ${payload.channel}`
+              : 'Failed to unsubscribe from channel',
+            channel: payload.channel,
+            timestamp: new Date().toISOString(),
+          })
+        );
+        logger.info('WebSocket unsubscription request', {
+          userId,
+          sessionId,
+          channel: payload.channel,
+          success,
+        });
+      } else {
+        socket.send(
+          JSON.stringify({
+            type: 'error',
+            message: 'Channel name is required for unsubscription',
+            timestamp: new Date().toISOString(),
+          })
+        );
+      }
       break;
 
     default:

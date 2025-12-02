@@ -1,5 +1,5 @@
 import { FastifyRequest } from 'fastify';
-import { SocketStream } from '@fastify/websocket';
+import type WebSocket from 'ws';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
 import { logger } from '../../core/logging/logger.js';
@@ -19,7 +19,14 @@ export interface TokenPayload {
  * Authenticates a WebSocket connection using JWT token
  * Requirement: 17.4
  */
-export async function authenticateWebSocket(request: FastifyRequest): Promise<TokenPayload | null> {
+export function authenticateWebSocket(request: FastifyRequest): Promise<TokenPayload | null> {
+  return Promise.resolve(authenticateWebSocketSync(request));
+}
+
+/**
+ * Synchronous authentication helper
+ */
+function authenticateWebSocketSync(request: FastifyRequest): TokenPayload | null {
   try {
     // Extract token from query parameter or authorization header
     const token = extractToken(request);
@@ -32,7 +39,7 @@ export async function authenticateWebSocket(request: FastifyRequest): Promise<To
     }
 
     // Verify JWT token
-    const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as TokenPayload;
+    const payload = jwt.verify(token, env.JWT_ACCESS_TOKEN_SECRET) as TokenPayload;
 
     // Validate payload structure
     if (!payload.userId || !payload.sessionId) {
@@ -73,7 +80,8 @@ export async function authenticateWebSocket(request: FastifyRequest): Promise<To
  */
 function extractToken(request: FastifyRequest): string | null {
   // Try query parameter first (for WebSocket connections)
-  const queryToken = (request.query as any)?.token;
+  const query = request.query as Record<string, unknown>;
+  const queryToken = query?.['token'];
   if (queryToken && typeof queryToken === 'string') {
     return queryToken;
   }
@@ -90,18 +98,24 @@ function extractToken(request: FastifyRequest): string | null {
 /**
  * Sends an error message and closes the WebSocket connection
  */
-export function sendErrorAndClose(socket: SocketStream, message: string): void {
+export function sendErrorAndClose(socket: WebSocket, message: string): void {
   try {
-    socket.send(
-      JSON.stringify({
-        type: 'error',
-        message,
-        timestamp: new Date().toISOString(),
-      })
-    );
+    if (socket.readyState === socket.OPEN) {
+      socket.send(
+        JSON.stringify({
+          type: 'error',
+          message,
+          timestamp: new Date().toISOString(),
+        })
+      );
+    }
     socket.close();
   } catch (error) {
     logger.error('Error sending WebSocket error message', { error });
-    socket.close();
+    try {
+      socket.close();
+    } catch {
+      // Socket already closed
+    }
   }
 }

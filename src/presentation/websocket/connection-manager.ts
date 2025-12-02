@@ -1,15 +1,16 @@
-import { SocketStream } from '@fastify/websocket';
+import type WebSocket from 'ws';
 import { logger } from '../../core/logging/logger.js';
 
 /**
  * Represents a WebSocket connection with associated metadata
  */
 export interface WebSocketConnection {
-  socket: SocketStream;
+  socket: WebSocket;
   userId: string;
   sessionId: string;
   connectedAt: Date;
   lastActivity: Date;
+  subscribedChannels: Set<string>;
 }
 
 /**
@@ -18,18 +19,19 @@ export interface WebSocketConnection {
  */
 export class ConnectionManager {
   private connections: Map<string, WebSocketConnection[]> = new Map();
-  private socketToUser: Map<SocketStream, string> = new Map();
+  private socketToUser: Map<WebSocket, string> = new Map();
 
   /**
    * Adds a new WebSocket connection for a user
    */
-  addConnection(userId: string, sessionId: string, socket: SocketStream): void {
+  addConnection(userId: string, sessionId: string, socket: WebSocket): void {
     const connection: WebSocketConnection = {
       socket,
       userId,
       sessionId,
       connectedAt: new Date(),
       lastActivity: new Date(),
+      subscribedChannels: new Set(['notifications']), // Default subscription
     };
 
     const userConnections = this.connections.get(userId) || [];
@@ -57,7 +59,7 @@ export class ConnectionManager {
   /**
    * Removes a WebSocket connection
    */
-  removeConnection(socket: SocketStream): void {
+  removeConnection(socket: WebSocket): void {
     const userId = this.socketToUser.get(socket);
     if (!userId) {
       return;
@@ -197,6 +199,123 @@ export class ConnectionManager {
     for (const userId of this.connections.keys()) {
       this.closeUserConnections(userId);
     }
+  }
+
+  /**
+   * Subscribes a connection to a channel
+   */
+  subscribeToChannel(socket: WebSocket, channel: string): boolean {
+    const userId = this.socketToUser.get(socket);
+    if (!userId) {
+      return false;
+    }
+
+    const userConnections = this.connections.get(userId);
+    if (!userConnections) {
+      return false;
+    }
+
+    const connection = userConnections.find((conn) => conn.socket === socket);
+    if (!connection) {
+      return false;
+    }
+
+    connection.subscribedChannels.add(channel);
+    logger.info('WebSocket subscribed to channel', {
+      userId,
+      sessionId: connection.sessionId,
+      channel,
+    });
+
+    return true;
+  }
+
+  /**
+   * Unsubscribes a connection from a channel
+   */
+  unsubscribeFromChannel(socket: WebSocket, channel: string): boolean {
+    const userId = this.socketToUser.get(socket);
+    if (!userId) {
+      return false;
+    }
+
+    const userConnections = this.connections.get(userId);
+    if (!userConnections) {
+      return false;
+    }
+
+    const connection = userConnections.find((conn) => conn.socket === socket);
+    if (!connection) {
+      return false;
+    }
+
+    connection.subscribedChannels.delete(channel);
+    logger.info('WebSocket unsubscribed from channel', {
+      userId,
+      sessionId: connection.sessionId,
+      channel,
+    });
+
+    return true;
+  }
+
+  /**
+   * Sends a message to all connections subscribed to a specific channel
+   */
+  async sendToChannel(channel: string, message: any): Promise<void> {
+    const messageStr = JSON.stringify(message);
+    const sendPromises: Promise<void>[] = [];
+
+    for (const userConnections of this.connections.values()) {
+      for (const connection of userConnections) {
+        if (connection.subscribedChannels.has(channel)) {
+          sendPromises.push(
+            (async () => {
+              try {
+                if (connection.socket.readyState === connection.socket.OPEN) {
+                  connection.socket.send(messageStr);
+                  connection.lastActivity = new Date();
+                }
+              } catch (error) {
+                logger.error('Error sending message to channel subscriber', {
+                  userId: connection.userId,
+                  sessionId: connection.sessionId,
+                  channel,
+                  error,
+                });
+                this.removeConnection(connection.socket);
+              }
+            })()
+          );
+        }
+      }
+    }
+
+    await Promise.allSettled(sendPromises);
+  }
+
+  /**
+   * Gets all connections subscribed to a specific channel
+   */
+  getChannelSubscribers(channel: string): WebSocketConnection[] {
+    const subscribers: WebSocketConnection[] = [];
+
+    for (const userConnections of this.connections.values()) {
+      for (const connection of userConnections) {
+        if (connection.subscribedChannels.has(channel)) {
+          subscribers.push(connection);
+        }
+      }
+    }
+
+    return subscribers;
+  }
+
+  /**
+   * Gets the number of subscribers for a channel
+   */
+  getChannelSubscriberCount(channel: string): number {
+    return this.getChannelSubscribers(channel).length;
   }
 }
 
