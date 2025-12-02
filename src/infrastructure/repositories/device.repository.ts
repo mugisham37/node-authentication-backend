@@ -1,4 +1,4 @@
-import { eq, and, lt, sql } from 'drizzle-orm';
+import { eq, lt } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { IDeviceRepository } from '../../domain/repositories/device.repository.js';
 import { Device } from '../../domain/entities/device.entity.js';
@@ -240,7 +240,7 @@ export class DeviceRepository implements IDeviceRepository {
   /**
    * Maps database row to Device entity
    */
-  private mapToEntity(row: any): Device {
+  private mapToEntity(row: unknown): Device {
     return new Device({
       id: row.id,
       userId: row.userId,

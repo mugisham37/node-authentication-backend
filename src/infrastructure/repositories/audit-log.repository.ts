@@ -7,10 +7,7 @@ import {
 import { AuditLog } from '../../domain/entities/audit-log.entity.js';
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
 import { auditLogs } from '../../core/database/schema/audit.schema.js';
-import {
-  NotFoundError,
-  ServiceUnavailableError,
-} from '../../core/errors/types/application-error.js';
+import { ServiceUnavailableError } from '../../core/errors/types/application-error.js';
 
 /**
  * Audit Log Repository Implementation using Drizzle ORM
@@ -247,7 +244,7 @@ export class AuditLogRepository implements IAuditLogRepository {
   /**
    * Maps database row to AuditLog entity
    */
-  private mapToEntity(row: any): AuditLog {
+  private mapToEntity(row: unknown): AuditLog {
     return new AuditLog({
       id: row.id,
       userId: row.userId,

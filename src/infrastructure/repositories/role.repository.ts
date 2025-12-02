@@ -53,7 +53,7 @@ export class RoleRepository implements IRoleRepository {
     try {
       const result = await this.db.select().from(roles).where(eq(roles.name, name)).limit(1);
 
-      if (result.length === 0) {
+      if (result.length === 0 || !result[0]) {
         return null;
       }
 
@@ -375,7 +375,7 @@ export class RoleRepository implements IRoleRepository {
   /**
    * Maps database row to Permission entity
    */
-  private mapPermissionToEntity(row: any): Permission {
+  private mapPermissionToEntity(row: unknown): Permission {
     return new Permission({
       id: row.id,
       resource: row.resource,

@@ -343,4 +343,5 @@ export class WebhookRepository implements IWebhookRepository {
       deliveredAt: row.deliveredAt,
       createdAt: row.createdAt,
     };
-  
+  }
+}

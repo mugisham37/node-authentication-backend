@@ -90,7 +90,7 @@ export class UserRepository implements IUserRepository {
         )
         .limit(1);
 
-      if (result.length === 0) {
+      if (result.length === 0 || !result[0]?.user) {
         return null;
       }
 
@@ -237,7 +237,7 @@ export class UserRepository implements IUserRepository {
   /**
    * Maps database row to User entity
    */
-  private mapToEntity(row: any): User {
+  private mapToEntity(row: unknown): User {
     return new User({
       id: row.id,
       email: new Email(row.email),
