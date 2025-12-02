@@ -224,9 +224,8 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
  * Requirements: 17.1, 17.2, 17.3, 17.4
  */
 async function initializeNotificationSystem(): Promise<void> {
-  const { setupNotificationEventListeners } = await import(
-    './application/services/notification-event-listeners.js'
-  );
+  const { setupNotificationEventListeners } =
+    await import('./application/services/notification-event-listeners.js');
   setupNotificationEventListeners();
   logger.info('Notification system initialized');
 }

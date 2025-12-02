@@ -8,27 +8,27 @@ import { logger } from '../../core/logging/logger.js';
 
 /**
  * Rate limiting service implementation using Redis sliding window algorithm
- * 
+ *
  * Features:
  * - Sliding window rate limiting using Redis sorted sets
  * - Per-IP and per-user rate limits
  * - Endpoint-specific configurations
  * - Trust-based rate limit adjustments
  * - Fail-open behavior when Redis is unavailable
- * 
+ *
  * Algorithm:
  * Uses Redis sorted sets (ZSET) where:
  * - Score = timestamp of request
  * - Member = unique identifier for each request
- * 
+ *
  * For each request:
  * 1. Remove entries outside the time window (ZREMRANGEBYSCORE)
  * 2. Count remaining entries (ZCARD)
  * 3. Add current request (ZADD)
  * 4. Set expiration on the key (EXPIRE)
- * 
+ *
  * This provides accurate sliding window behavior without fixed time buckets.
- * 
+ *
  * @implements {IRateLimitService}
  */
 export class RateLimitService implements IRateLimitService {
@@ -47,7 +47,7 @@ export class RateLimitService implements IRateLimitService {
 
   /**
    * Initialize default rate limit configurations for endpoints
-   * 
+   *
    * Configurations match requirements:
    * - Authentication: 10 req/min (Requirement 14.2)
    * - Registration: 3 req/5min (Requirement 14.4)
@@ -192,14 +192,14 @@ export class RateLimitService implements IRateLimitService {
 
   /**
    * Adjust rate limits based on user trust score
-   * 
+   *
    * Trust score ranges:
    * - High trust (>= 80): 50% more requests allowed
    * - Medium trust (>= 50): 20% more requests allowed
    * - Low trust (< 50): Default limits
-   * 
+   *
    * This implements Requirement 14.7: Trust-based rate limit adjustment
-   * 
+   *
    * @param config - Base rate limit configuration
    * @param trustScore - User trust score (0-100)
    * @returns Adjusted rate limit configuration

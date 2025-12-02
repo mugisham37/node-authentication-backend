@@ -1,24 +1,23 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { logger } from '../logging/logger.js';
-import type { WebhookEvent } from '../../application/services/webhook-delivery.service.js';
-
-export interface WebhookJobData extends WebhookEvent {
-  attemptCount: number;
-}
+import { WEBHOOK_JOB_TYPES, WebhookJobData } from './jobs/webhook-jobs.js';
+import { WebhookProcessor } from './processors/webhook-processor.js';
 
 export class WebhookQueue {
   private queue: Queue<WebhookJobData>;
   private worker: Worker<WebhookJobData> | null = null;
   private connection: Redis;
+  private processor: WebhookProcessor;
 
   constructor(redisConnection: Redis) {
     this.connection = redisConnection;
+    this.processor = new WebhookProcessor();
 
     this.queue = new Queue<WebhookJobData>('webhook', {
       connection: this.connection,
       defaultJobOptions: {
-        attempts: 5,
+        attempts: 5, // Requirement: 16.3 - retry up to 5 times
         backoff: {
           type: 'exponential',
           delay: 2000, // Start with 2 seconds
@@ -34,28 +33,41 @@ export class WebhookQueue {
     });
   }
 
+  /**
+   * Add webhook delivery job
+   * Requirement: 16.2
+   */
+
   async addWebhookJob(data: WebhookJobData): Promise<void> {
     try {
-      await this.queue.add('deliver-webhook', data, {
+      await this.queue.add(WEBHOOK_JOB_TYPES.DELIVER, data, {
         priority: 5, // Default priority
+        backoff: {
+          type: 'custom',
+        },
       });
 
       logger.info('Webhook job added to queue', {
         webhookId: data.webhookId,
-        eventType: data.type,
+        eventType: data.eventType,
         url: data.webhookUrl,
       });
     } catch (error) {
       logger.error('Failed to add webhook job to queue', {
         error,
         webhookId: data.webhookId,
-        eventType: data.type,
+        eventType: data.eventType,
       });
       throw error;
     }
   }
 
-  startWorker(processor: (job: Job<WebhookJobData>) => Promise<void>): void {
+  /**
+   * Start the webhook worker
+   * Processes webhook delivery jobs from the queue
+   * Requirement: 16.2, 16.3
+   */
+  startWorker(): void {
     if (this.worker) {
       logger.warn('Webhook worker already started');
       return;
@@ -64,34 +76,17 @@ export class WebhookQueue {
     this.worker = new Worker<WebhookJobData>(
       'webhook',
       async (job: Job<WebhookJobData>) => {
-        try {
-          logger.info('Processing webhook job', {
-            jobId: job.id,
-            webhookId: job.data.webhookId,
-            eventType: job.data.type,
-            url: job.data.webhookUrl,
-            attempt: job.attemptsMade + 1,
-          });
-
-          await processor(job);
-
-          logger.info('Webhook job completed', {
-            jobId: job.id,
-            webhookId: job.data.webhookId,
-          });
-        } catch (error) {
-          logger.error('Webhook job failed', {
-            jobId: job.id,
-            webhookId: job.data.webhookId,
-            error,
-            attempt: job.attemptsMade + 1,
-          });
-          throw error;
-        }
+        await this.processor.process(job);
       },
       {
         connection: this.connection,
         concurrency: 10, // Process up to 10 webhooks concurrently
+        settings: {
+          backoffStrategy: (attemptsMade: number) => {
+            // Custom exponential backoff (Requirement: 16.3)
+            return WebhookProcessor.calculateRetryDelay(attemptsMade);
+          },
+        },
       }
     );
 
@@ -103,6 +98,7 @@ export class WebhookQueue {
       logger.error('Webhook worker failed job', {
         jobId: job?.id,
         error,
+        attempts: job?.attemptsMade,
       });
     });
 

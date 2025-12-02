@@ -152,8 +152,6 @@ export class EmailQueue {
     logger.info('Email queue closed');
   }
 
-
-
   async getQueueMetrics(): Promise<{
     waiting: number;
     active: number;

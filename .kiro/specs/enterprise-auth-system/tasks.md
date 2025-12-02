@@ -850,14 +850,17 @@
   - Implement async audit log writing
   - _Requirements: 13.1_
 
-- [-] 14.3 Implement webhook delivery jobs
+- [x] 14.3 Implement webhook delivery jobs
+
 
   - Create webhook delivery job
   - Implement retry logic with exponential backoff
   - Track delivery attempts
   - _Requirements: 16.2, 16.3_
 
-- [ ] 14.4 Implement cleanup jobs
+- [x] 14.4 Implement cleanup jobs
+
+
   - Create expired session cleanup job
   - Create expired token cleanup job
   - Create unused device cleanup job

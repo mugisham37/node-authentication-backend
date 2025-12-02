@@ -47,7 +47,6 @@ function setupConnection(
   userId: string,
   sessionId: string
 ): void {
-
   // Add connection to manager
   connectionManager.addConnection(userId, sessionId, socket);
 
