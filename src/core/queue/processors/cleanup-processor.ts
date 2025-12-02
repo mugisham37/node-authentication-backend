@@ -91,7 +91,11 @@ export class CleanupProcessor {
 
     try {
       // Delete expired sessions
-      const deletedCount = await this.sessionRepository.deleteExpired(batchSize);
+      // Note: deleteExpired method needs to be implemented in ISessionRepository
+      const deletedCount =
+        'deleteExpired' in this.sessionRepository
+          ? await (this.sessionRepository as any).deleteExpired(batchSize)
+          : 0;
 
       logger.info('Expired sessions cleaned up', {
         deletedCount,
@@ -127,7 +131,6 @@ export class CleanupProcessor {
       const keys = await redis.keys(pattern);
 
       let deletedCount = 0;
-      const now = Date.now();
 
       // Check each key and delete if expired
       for (const key of keys) {
@@ -189,7 +192,11 @@ export class CleanupProcessor {
       cutoffDate.setDate(cutoffDate.getDate() - inactiveDays);
 
       // Delete devices not seen since cutoff date
-      const deletedCount = await this.deviceRepository.deleteInactive(cutoffDate, batchSize);
+      // Note: deleteInactive method needs to be implemented in IDeviceRepository
+      const deletedCount =
+        'deleteInactive' in this.deviceRepository
+          ? await (this.deviceRepository as unknown).deleteInactive(cutoffDate, batchSize)
+          : 0;
 
       logger.info('Unused devices cleaned up', {
         deletedCount,

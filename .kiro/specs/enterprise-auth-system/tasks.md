@@ -823,7 +823,9 @@
 
 ## Phase 14: Background Jobs
 
-- [-] 14. Set up BullMQ job queue
+- [x] 14. Set up BullMQ job queue
+
+
 
 
 

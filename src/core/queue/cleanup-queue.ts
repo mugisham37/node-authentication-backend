@@ -4,7 +4,7 @@
  * Requirements: 7.5, 15.6
  */
 
-import { Queue, Worker, Job, QueueScheduler } from 'bullmq';
+import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { logger } from '../logging/logger.js';
 import {
@@ -219,7 +219,7 @@ export class CleanupQueue {
   /**
    * Get scheduled jobs
    */
-  async getScheduledJobs(): Promise<Job[]> {
+  async getScheduledJobs() {
     return await this.queue.getRepeatableJobs();
   }
 
