@@ -97,6 +97,24 @@ export function getRedis(): RedisClient | Cluster {
 }
 
 /**
+ * Get Redis connection configuration for BullMQ
+ * Returns connection options compatible with BullMQ
+ */
+export function getRedisConnection(): {
+  host: string;
+  port: number;
+  password?: string;
+  db?: number;
+} {
+  return {
+    host: redisConfig.host,
+    port: redisConfig.port,
+    password: redisConfig.password,
+    db: redisConfig.db,
+  };
+}
+
+/**
  * Get a value from cache
  */
 export async function get<T = string>(key: string): Promise<T | null> {

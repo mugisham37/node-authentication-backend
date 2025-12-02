@@ -67,3 +67,27 @@ export {
 export { AuthorizationService, type IAuthorizationService } from './authorization.service.js';
 
 export { SystemRolesService } from './system-roles.service.js';
+
+export {
+  AuditLogService,
+  type IAuditLogService,
+  type CreateAuditLogInput,
+  type SecurityAlert,
+  type AuditLogQueryResult,
+} from './audit-log.service.js';
+
+export {
+  RiskAssessmentService,
+  type IRiskAssessmentService,
+  type LoginAttempt,
+  type RiskAssessment,
+  type AlertSeverity,
+} from './risk-assessment.service.js';
+
+export {
+  DeviceService,
+  type IDeviceService,
+  type RegisterDeviceInput,
+  type RegisterDeviceOutput,
+  type DeviceListItem,
+} from './device.service.js';
