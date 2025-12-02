@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enterprise-auth-prod
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - deployment-patch.yaml
+  - hpa-patch.yaml
+
+configMapGenerator:
+  - name: enterprise-auth-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+      - PROMETHEUS_ENABLED=true
+      - OPENTELEMETRY_ENABLED=true
+
+images:
+  - name: enterprise-auth
+    newName: your-registry/enterprise-auth
+    newTag: v1.0.0

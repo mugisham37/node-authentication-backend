@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enterprise-auth
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+
+commonLabels:
+  app.kubernetes.io/name: enterprise-auth
+  app.kubernetes.io/component: backend
+  app.kubernetes.io/part-of: enterprise-auth-system
+
+images:
+  - name: enterprise-auth
+    newName: your-registry/enterprise-auth
+    newTag: latest

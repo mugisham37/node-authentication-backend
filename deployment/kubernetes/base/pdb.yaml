@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: enterprise-auth-pdb
+  namespace: enterprise-auth
+  labels:
+    app: enterprise-auth
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: enterprise-auth
+  unhealthyPodEvictionPolicy: AlwaysAllow

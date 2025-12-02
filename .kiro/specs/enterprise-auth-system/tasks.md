@@ -1149,7 +1149,10 @@
   - Add volume mounts for persistence
   - _Requirements: All_
 
-- [ ] 21.2 Create Kubernetes manifests
+- [-] 21.2 Create Kubernetes manifests
+
+
+
   - Create Deployment manifest with 3 replicas
   - Create Service manifest
   - Create ConfigMap for configuration

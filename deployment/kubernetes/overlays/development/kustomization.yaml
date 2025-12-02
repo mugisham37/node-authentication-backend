@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enterprise-auth-dev
+
+namePrefix: dev-
+
+commonLabels:
+  environment: development
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - deployment-patch.yaml
+
+configMapGenerator:
+  - name: enterprise-auth-config
+    behavior: merge
+    literals:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - PROMETHEUS_ENABLED=false
+      - OPENTELEMETRY_ENABLED=false
+
+images:
+  - name: enterprise-auth
+    newName: your-registry/enterprise-auth
+    newTag: dev-latest

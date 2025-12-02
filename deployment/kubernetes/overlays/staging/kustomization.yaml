@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: enterprise-auth-staging
+
+namePrefix: staging-
+
+commonLabels:
+  environment: staging
+
+bases:
+  - ../../base
+
+patchesStrategicMerge:
+  - deployment-patch.yaml
+
+configMapGenerator:
+  - name: enterprise-auth-config
+    behavior: merge
+    literals:
+      - NODE_ENV=staging
+      - LOG_LEVEL=debug
+      - PROMETHEUS_ENABLED=true
+      - OPENTELEMETRY_ENABLED=true
+
+images:
+  - name: enterprise-auth
+    newName: your-registry/enterprise-auth
+    newTag: staging-latest
