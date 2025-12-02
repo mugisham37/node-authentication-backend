@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from './authentication.middleware.js';
 import { AuthorizationError } from '../../core/errors/types/application-error.js';
 import { container } from '../../core/container/container.js';
 import { IAuthorizationService } from '../../application/services/authorization.service.js';
+import { logAuthorizationFailure } from './audit-logging.middleware.js';
 
 export interface PermissionCheck {
   resource: string;
@@ -16,7 +17,7 @@ export interface PermissionCheck {
  * @returns Fastify middleware function
  */
 export function requirePermission(resource: string, action: string) {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
     const authRequest = request as AuthenticatedRequest;
 
     // Ensure user is authenticated
@@ -33,6 +34,9 @@ export function requirePermission(resource: string, action: string) {
     const hasPermission = await authorizationService.checkPermission(userId, resource, action);
 
     if (!hasPermission) {
+      // Log authorization failure (Requirement: 13.2, 19.3)
+      await logAuthorizationFailure(request, { resource, action });
+
       throw new AuthorizationError(`Insufficient permissions to ${action} ${resource}`, {
         resource,
         action,
@@ -48,7 +52,7 @@ export function requirePermission(resource: string, action: string) {
  * @returns Fastify middleware function
  */
 export function requireAnyPermission(permissions: PermissionCheck[]) {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
     const authRequest = request as AuthenticatedRequest;
 
     if (!authRequest.user || !authRequest.user.userId) {
@@ -68,6 +72,11 @@ export function requireAnyPermission(permissions: PermissionCheck[]) {
     const hasAnyPermission = permissionChecks.some((hasPermission) => hasPermission);
 
     if (!hasAnyPermission) {
+      // Log authorization failure (Requirement: 13.2, 19.3)
+      if (permissions.length > 0) {
+        await logAuthorizationFailure(request, permissions[0]);
+      }
+
       throw new AuthorizationError('Insufficient permissions', {
         requiredPermissions: permissions,
         userId,
@@ -82,7 +91,7 @@ export function requireAnyPermission(permissions: PermissionCheck[]) {
  * @returns Fastify middleware function
  */
 export function requireAllPermissions(permissions: PermissionCheck[]) {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
     const authRequest = request as AuthenticatedRequest;
 
     if (!authRequest.user || !authRequest.user.userId) {
@@ -104,6 +113,11 @@ export function requireAllPermissions(permissions: PermissionCheck[]) {
     if (!hasAllPermissions) {
       const missingPermissions = permissions.filter((_, index) => !permissionChecks[index]);
 
+      // Log authorization failure (Requirement: 13.2, 19.3)
+      if (missingPermissions.length > 0) {
+        await logAuthorizationFailure(request, missingPermissions[0]);
+      }
+
       throw new AuthorizationError('Insufficient permissions', {
         requiredPermissions: permissions,
         missingPermissions,
@@ -116,7 +130,7 @@ export function requireAllPermissions(permissions: PermissionCheck[]) {
 /**
  * Middleware that requires user to have admin role
  */
-export async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+export async function requireAdmin(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   const authRequest = request as AuthenticatedRequest;
 
   if (!authRequest.user || !authRequest.user.userId) {
@@ -129,6 +143,9 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   const isAdmin = userRoles.some((role) => role.name === 'admin');
 
   if (!isAdmin) {
+    // Log authorization failure (Requirement: 13.2, 19.3)
+    await logAuthorizationFailure(request, { resource: 'admin', action: 'access' });
+
     throw new AuthorizationError('Admin access required', {
       userId: authRequest.user.userId,
     });
@@ -142,7 +159,7 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
 export function requireOwnershipOrAdmin(
   getUserIdFromRequest: (request: FastifyRequest) => string | Promise<string>
 ) {
-  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+  return async (request: FastifyRequest, _reply: FastifyReply): Promise<void> => {
     const authRequest = request as AuthenticatedRequest;
 
     if (!authRequest.user || !authRequest.user.userId) {
@@ -163,6 +180,9 @@ export function requireOwnershipOrAdmin(
     const isAdmin = userRoles.some((role) => role.name === 'admin');
 
     if (!isAdmin) {
+      // Log authorization failure (Requirement: 13.2, 19.3)
+      await logAuthorizationFailure(request, { resource: 'resource', action: 'access' });
+
       throw new AuthorizationError('Access denied. You can only access your own resources.', {
         userId: currentUserId,
         resourceOwnerId,

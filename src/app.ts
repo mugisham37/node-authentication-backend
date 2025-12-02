@@ -28,24 +28,87 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   // Register CORS
+  // Requirements: All API requirements, 19.2
   await app.register(cors, {
+    // Configure allowed origins from environment
     origin: env.CORS_ORIGIN.split(',').map((origin) => origin.trim()),
+    // Enable credentials support (cookies, authorization headers)
     credentials: env.CORS_CREDENTIALS,
+    // Configure allowed HTTP methods
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
-    exposedHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+    // Configure allowed request headers
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-ID',
+      'X-Correlation-ID',
+      'Accept',
+      'Accept-Language',
+      'Content-Language',
+    ],
+    // Configure exposed response headers
+    exposedHeaders: [
+      'X-Request-ID',
+      'X-RateLimit-Limit',
+      'X-RateLimit-Remaining',
+      'X-RateLimit-Reset',
+      'Retry-After',
+      'Content-Range',
+      'X-Total-Count',
+    ],
+    // Preflight cache duration (24 hours)
+    maxAge: 86400,
+    // Allow preflight to pass through
+    preflightContinue: false,
+    // Provide successful preflight status
+    optionsSuccessStatus: 204,
   });
 
   // Register Helmet for security headers
+  // Requirements: All security requirements, 19.1
   await app.register(helmet, {
+    // Content Security Policy - prevents XSS attacks
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'", "'unsafe-inline'"], // Required for Swagger UI
         imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
       },
     },
+    // X-Frame-Options - prevents clickjacking attacks
+    frameguard: {
+      action: 'deny',
+    },
+    // X-Content-Type-Options - prevents MIME type sniffing
+    noSniff: true,
+    // Referrer-Policy - controls referrer information
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
+    // Strict-Transport-Security - enforces HTTPS
+    hsts: {
+      maxAge: 31536000, // 1 year in seconds
+      includeSubDomains: true,
+      preload: true,
+    },
+    // X-DNS-Prefetch-Control - controls DNS prefetching
+    dnsPrefetchControl: {
+      allow: false,
+    },
+    // X-Download-Options - prevents IE from executing downloads
+    ieNoOpen: true,
+    // X-Permitted-Cross-Domain-Policies - controls cross-domain policies
+    permittedCrossDomainPolicies: {
+      permittedPolicies: 'none',
+    },
+    // Hide X-Powered-By header
+    hidePoweredBy: true,
     crossOriginEmbedderPolicy: false,
   });
 
@@ -108,6 +171,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     );
   });
 
+  // Audit logging middleware for security events
+  // Requirements: 13.1, 13.2, 19.3
+  const { auditLoggingMiddleware } =
+    await import('./presentation/middleware/audit-logging.middleware.js');
+  app.addHook('onRequest', auditLoggingMiddleware);
+
   // Response logging middleware
   app.addHook('onResponse', async (request: FastifyRequest, reply: FastifyReply) => {
     request.log.info(
@@ -160,7 +229,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
 
     // Handle Fastify validation errors
-    if (error.name === 'FastifyError' && (error as any).validation) {
+    if (error.name === 'FastifyError' && (error as unknown).validation) {
       return reply.status(400).send({
         error: {
           type: 'ValidationError',
