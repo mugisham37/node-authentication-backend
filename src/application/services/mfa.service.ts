@@ -11,6 +11,8 @@ import {
   ValidationError,
 } from '../../core/errors/types/application-error.js';
 import * as redis from '../../core/cache/redis.js';
+import { domainEventEmitter } from '../../domain/events/event-emitter.js';
+import { MFAEnabledEvent, MFADisabledEvent } from '../../domain/events/mfa-events.js';
 
 /**
  * Input for TOTP MFA setup
@@ -253,6 +255,9 @@ export class MFAService implements IMFAService {
     // Enable MFA for the user
     user.enableMFA(input.secret, backupCodes);
     await this.userRepository.update(user);
+
+    // Emit MFA enabled event (Requirement 17.3)
+    await domainEventEmitter.emit(new MFAEnabledEvent(user.id, 'totp'));
   }
 
   /**
@@ -296,6 +301,9 @@ export class MFAService implements IMFAService {
     // Disable MFA
     user.disableMFA();
     await this.userRepository.update(user);
+
+    // Emit MFA disabled event (Requirement 17.3)
+    await domainEventEmitter.emit(new MFADisabledEvent(user.id, user.id));
   }
 
   /**

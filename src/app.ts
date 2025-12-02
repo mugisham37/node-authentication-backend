@@ -2,6 +2,7 @@ import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import websocket from '@fastify/websocket';
 import { env } from './config/env.js';
 import { logger } from './core/logging/logger.js';
 import { ApplicationError } from './core/errors/types/application-error.js';
@@ -165,8 +166,14 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     });
   });
 
+  // Register WebSocket support
+  await app.register(websocket);
+
   // Register routes
   await registerRoutes(app);
+
+  // Initialize notification event listeners
+  await initializeNotificationSystem();
 
   return app;
 }
@@ -185,6 +192,7 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
   const { adminRoutes } = await import('./presentation/routes/admin.routes.js');
   const { webhookRoutes } = await import('./presentation/routes/webhook.routes.js');
   const { monitoringRoutes } = await import('./presentation/routes/monitoring.routes.js');
+  const { setupWebSocketRoutes } = await import('./presentation/websocket/websocket-handler.js');
 
   // Register all routes
   await authRoutes(app);
@@ -198,6 +206,9 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
   await webhookRoutes(app);
   await monitoringRoutes(app);
 
+  // Register WebSocket routes
+  await setupWebSocketRoutes(app);
+
   // Root health check
   app.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
     return reply.status(200).send({
@@ -206,6 +217,18 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
       uptime: process.uptime(),
     });
   });
+}
+
+/**
+ * Initialize notification system event listeners
+ * Requirements: 17.1, 17.2, 17.3, 17.4
+ */
+async function initializeNotificationSystem(): Promise<void> {
+  const { setupNotificationEventListeners } = await import(
+    './application/services/notification-event-listeners.js'
+  );
+  setupNotificationEventListeners();
+  logger.info('Notification system initialized');
 }
 
 export async function startServer(app: FastifyInstance): Promise<void> {
@@ -226,6 +249,11 @@ export async function gracefulShutdown(app: FastifyInstance): Promise<void> {
   logger.info('Received shutdown signal, closing server gracefully...');
 
   try {
+    // Close all WebSocket connections
+    const { connectionManager } = await import('./presentation/websocket/connection-manager.js');
+    connectionManager.closeAllConnections();
+    logger.info('All WebSocket connections closed');
+
     await app.close();
     logger.info('Server closed successfully');
     process.exit(0);

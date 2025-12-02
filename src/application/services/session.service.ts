@@ -5,6 +5,8 @@ import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
 import { NotFoundError, AuthenticationError } from '../../core/errors/types/application-error.js';
 import { log } from '../../core/logging/logger.js';
+import { domainEventEmitter } from '../../domain/events/event-emitter.js';
+import { SessionCreatedEvent, SessionRevokedEvent } from '../../domain/events/session-events.js';
 
 /**
  * Input for session creation
@@ -184,6 +186,16 @@ export class SessionService implements ISessionService {
     // Save session
     const savedSession = await this.sessionRepository.create(session);
 
+    // Emit session created event (Requirement 17.1)
+    await domainEventEmitter.emit(
+      new SessionCreatedEvent(
+        savedSession.id,
+        savedSession.userId,
+        savedSession.deviceFingerprint.toString(),
+        savedSession.ipAddress.toString()
+      )
+    );
+
     log.info('Session created', {
       sessionId: savedSession.id,
       userId: input.userId,
@@ -269,6 +281,11 @@ export class SessionService implements ISessionService {
     // Revoke session
     session.revoke();
     await this.sessionRepository.update(session);
+
+    // Emit session revoked event (Requirement 17.4)
+    await domainEventEmitter.emit(
+      new SessionRevokedEvent(sessionId, userId, userId) // revokedBy is the user themselves
+    );
 
     log.info('Session revoked', {
       sessionId,

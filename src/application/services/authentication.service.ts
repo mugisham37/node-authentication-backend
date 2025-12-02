@@ -13,13 +13,13 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../core/errors/types/application-error.js';
-// Domain events - to be emitted via event bus in production
-// import {
-//   UserRegisteredEvent,
-//   UserLoggedInEvent,
-//   EmailVerifiedEvent,
-//   PasswordChangedEvent,
-// } from '../../domain/events/user-events.js';
+import { domainEventEmitter } from '../../domain/events/event-emitter.js';
+import {
+  UserRegisteredEvent,
+  UserLoggedInEvent,
+  EmailVerifiedEvent,
+  PasswordChangedEvent,
+} from '../../domain/events/user-events.js';
 
 /**
  * Input for user registration
@@ -457,8 +457,8 @@ export class AuthenticationService implements IAuthenticationService {
     // Terminate all sessions except current (Requirement 10.5)
     await this.sessionRepository.deleteByUserId(user.id);
 
-    // Emit domain event (Requirement 10.6)
-    // new PasswordChangedEvent(user.id, user.id);
+    // Emit domain event (Requirement 10.6, 17.2)
+    await domainEventEmitter.emit(new PasswordChangedEvent(user.id, user.id));
   }
 
   /**
