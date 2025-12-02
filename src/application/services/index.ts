@@ -64,7 +64,6 @@ export {
   type AuthenticateWithWebAuthnOutput,
 } from './passwordless.service.js';
 
-export {
-  AuthorizationService,
-  type IAuthorizationService,
-} from './authorization.service.js';
+export { AuthorizationService, type IAuthorizationService } from './authorization.service.js';
+
+export { SystemRolesService } from './system-roles.service.js';

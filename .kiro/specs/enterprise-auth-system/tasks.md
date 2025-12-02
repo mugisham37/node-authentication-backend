@@ -327,7 +327,9 @@
 
 ## Phase 8: Application Layer - Authorization
 
-- [-] 8. Implement authorization service
+- [x] 8. Implement authorization service
+
+
 
 
 
@@ -355,7 +357,9 @@
   - **Property 63: Permission check performance**
   - **Validates: Requirements 12.5**
 
-- [ ] 8.3 Implement system roles initialization
+- [x] 8.3 Implement system roles initialization
+
+
   - Create default admin, user, and moderator roles
   - Mark system roles to prevent deletion
   - Assign default permissions to each role
