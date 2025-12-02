@@ -3,12 +3,25 @@ import { randomUUID } from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
 
 export const correlationIdStorage = new AsyncLocalStorage<string>();
+export const userContextStorage = new AsyncLocalStorage<{ userId?: string; email?: string }>();
 
 const correlationIdFormat = winston.format((info) => {
   const correlationId = correlationIdStorage.getStore();
   if (correlationId) {
     info['correlationId'] = correlationId;
   }
+
+  // Add user context if available (Requirement 22.2)
+  const userContext = userContextStorage.getStore();
+  if (userContext) {
+    if (userContext.userId) {
+      info['userId'] = userContext.userId;
+    }
+    if (userContext.email) {
+      info['userEmail'] = userContext.email;
+    }
+  }
+
   return info;
 });
 
@@ -66,6 +79,45 @@ export async function withCorrelationIdAsync<T>(
   return correlationIdStorage.run(correlationId, fn);
 }
 
+export function setUserContext(userId?: string, email?: string): void {
+  const context = userContextStorage.getStore() || {};
+  if (userId) context.userId = userId;
+  if (email) context.email = email;
+}
+
+export function withUserContext<T>(userId: string, email: string, fn: () => T): T {
+  return userContextStorage.run({ userId, email }, fn);
+}
+
+export async function withUserContextAsync<T>(
+  userId: string,
+  email: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  return userContextStorage.run({ userId, email }, fn);
+}
+
+/**
+ * Sample rate tracker for high-volume logs
+ * Requirement 22.2 - Implement log sampling for high-volume logs
+ */
+const sampleCounters = new Map<string, number>();
+
+function shouldSample(key: string, sampleRate: number): boolean {
+  if (sampleRate >= 1) return true;
+  if (sampleRate <= 0) return false;
+
+  const count = (sampleCounters.get(key) || 0) + 1;
+  sampleCounters.set(key, count);
+
+  // Reset counter periodically to prevent memory growth
+  if (count > 10000) {
+    sampleCounters.set(key, 0);
+  }
+
+  return count % Math.floor(1 / sampleRate) === 0;
+}
+
 export const log = {
   info: (message: string, meta?: Record<string, unknown>) => {
     logger.info(message, meta);
@@ -107,6 +159,25 @@ export const log = {
       userId,
       category: 'audit',
     });
+  },
+
+  /**
+   * Log with sampling for high-volume operations
+   * Requirement 22.2 - Implement log sampling for high-volume logs
+   * @param key - Unique key for this log type
+   * @param sampleRate - Rate to sample (0.1 = 10%, 0.01 = 1%)
+   * @param message - Log message
+   * @param meta - Additional metadata
+   */
+  sampled: (
+    key: string,
+    sampleRate: number,
+    message: string,
+    meta?: Record<string, unknown>
+  ) => {
+    if (shouldSample(key, sampleRate)) {
+      logger.info(message, { ...meta, sampled: true, sampleRate });
+    }
   },
 };
 

@@ -1,8 +1,13 @@
 import { buildApp, startServer, gracefulShutdown } from './app.js';
 import { logger } from './core/logging/logger.js';
+import { initializeTracing, shutdownTracing } from './core/monitoring/tracing.js';
 
 async function main() {
   try {
+    // Initialize distributed tracing (Requirement 22.3)
+    initializeTracing();
+    logger.info('Distributed tracing initialized');
+
     logger.info('Starting Enterprise Authentication System...');
 
     const app = await buildApp();

@@ -14,12 +14,15 @@ import {
   ValidationError,
 } from '../../core/errors/types/application-error.js';
 import { domainEventEmitter } from '../../domain/events/event-emitter.js';
+import { PasswordChangedEvent } from '../../domain/events/user-events.js';
 import {
-  UserRegisteredEvent,
-  UserLoggedInEvent,
-  EmailVerifiedEvent,
-  PasswordChangedEvent,
-} from '../../domain/events/user-events.js';
+  userRegistrations,
+  userLogins,
+  passwordResets,
+  authenticationAttempts,
+  authenticationDuration,
+  failedLoginAttempts,
+} from '../../core/monitoring/metrics.js';
 
 /**
  * Input for user registration
@@ -227,6 +230,9 @@ export class AuthenticationService implements IAuthenticationService {
     // In production, this would be handled by an event emitter/bus
     // new UserRegisteredEvent(savedUser.id, email.toString(), savedUser.name);
 
+    // Track business metric (Requirement 22.1)
+    userRegistrations.inc({ method: 'email' });
+
     return {
       user: {
         id: savedUser.id,
@@ -244,28 +250,48 @@ export class AuthenticationService implements IAuthenticationService {
    * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7
    */
   async login(input: LoginInput): Promise<LoginOutput> {
-    // Find and validate user
-    const user = await this.validateUserCredentials(input.email, input.password);
+    const startTime = Date.now();
 
-    // Check if MFA is enabled (Requirement 3.4)
-    if (user.hasMFAEnabled()) {
-      return this.createMFAChallenge(user);
+    try {
+      // Track authentication attempt (Requirement 22.1)
+      authenticationAttempts.inc({ method: 'password', status: 'started' });
+
+      // Find and validate user
+      const user = await this.validateUserCredentials(input.email, input.password);
+
+      // Check if MFA is enabled (Requirement 3.4)
+      if (user.hasMFAEnabled()) {
+        authenticationAttempts.inc({ method: 'password', status: 'mfa_required' });
+        return this.createMFAChallenge(user);
+      }
+
+      // Create session (Requirement 3.7)
+      const session = await this.createSession(user.id, input);
+
+      // Emit domain event
+      // new UserLoggedInEvent(user.id, session.id, input.ipAddress, input.userAgent);
+
+      // Track successful login (Requirement 22.1)
+      authenticationAttempts.inc({ method: 'password', status: 'success' });
+      userLogins.inc({ method: 'password', mfa_enabled: 'false' });
+
+      return {
+        user: this.mapUserToOutput(user),
+        session: {
+          id: session.id,
+          expiresAt: session.expiresAt,
+        },
+        requiresMFA: false,
+      };
+    } catch (error) {
+      // Track failed authentication (Requirement 22.1)
+      authenticationAttempts.inc({ method: 'password', status: 'failed' });
+      throw error;
+    } finally {
+      // Track authentication duration (Requirement 22.1)
+      const duration = (Date.now() - startTime) / 1000;
+      authenticationDuration.observe({ method: 'password' }, duration);
     }
-
-    // Create session (Requirement 3.7)
-    const session = await this.createSession(user.id, input);
-
-    // Emit domain event
-    // new UserLoggedInEvent(user.id, session.id, input.ipAddress, input.userAgent);
-
-    return {
-      user: this.mapUserToOutput(user),
-      session: {
-        id: session.id,
-        expiresAt: session.expiresAt,
-      },
-      requiresMFA: false,
-    };
   }
 
   /**
@@ -297,6 +323,10 @@ export class AuthenticationService implements IAuthenticationService {
       // Increment failed attempts and potentially lock account (Requirement 3.6)
       user.incrementFailedAttempts();
       await this.userRepository.update(user);
+
+      // Track failed login attempt (Requirement 22.1)
+      failedLoginAttempts.inc({ reason: 'invalid_password' });
+
       throw new AuthenticationError('Invalid email or password');
     }
 
@@ -459,6 +489,9 @@ export class AuthenticationService implements IAuthenticationService {
 
     // Emit domain event (Requirement 10.6, 17.2)
     await domainEventEmitter.emit(new PasswordChangedEvent(user.id, user.id));
+
+    // Track password reset (Requirement 22.1)
+    passwordResets.inc();
   }
 
   /**

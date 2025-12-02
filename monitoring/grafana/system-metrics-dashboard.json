@@ -1,0 +1,332 @@
+{
+  "dashboard": {
+    "title": "Enterprise Auth System - System Metrics",
+    "tags": ["authentication", "system", "performance"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{path}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Requests/sec",
+            "format": "reqps"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "HTTP Request Duration (p95)",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{path}} - p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{path}} - p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ],
+        "alert": {
+          "name": "High HTTP Response Time",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.2],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "HTTP p95 response time exceeds 200ms threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "5xx Errors - {{method}} {{path}}",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(http_requests_total{status=~\"4..\"}[5m])",
+            "legendFormat": "4xx Errors - {{method}} {{path}}",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Errors/sec",
+            "format": "reqps"
+          }
+        ],
+        "alert": {
+          "name": "High Error Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [10],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "5xx error rate exceeds threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Database Query Duration (p95)",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(database_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{operation}} - p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(database_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{operation}} - p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Database Connection Pool",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "database_connection_pool_size{state=\"active\"}",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          },
+          {
+            "expr": "database_connection_pool_size{state=\"idle\"}",
+            "legendFormat": "Idle Connections",
+            "refId": "B"
+          },
+          {
+            "expr": "database_connection_pool_size{state=\"total\"}",
+            "legendFormat": "Total Connections",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Connections",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Cache Hit Rate",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "cache_hit_rate",
+            "legendFormat": "{{operation}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Hit Rate %",
+            "format": "percent",
+            "max": 100,
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Cache Operations Rate",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(cache_operations_total{operation=\"hit\"}[5m])",
+            "legendFormat": "Cache Hits",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(cache_operations_total{operation=\"miss\"}[5m])",
+            "legendFormat": "Cache Misses",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(cache_operations_total{operation=\"set\"}[5m])",
+            "legendFormat": "Cache Sets",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Operations/sec",
+            "format": "ops"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Job Queue Size",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "job_queue_size",
+            "legendFormat": "{{queue}} - {{state}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Jobs",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "High Job Queue Size",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1000],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Job queue size exceeds threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 9,
+        "title": "Job Processing Duration",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(job_processing_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{job_type}} - p95",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "System Resource Usage",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "process_cpu_percent",
+            "legendFormat": "CPU Usage %",
+            "refId": "A"
+          },
+          {
+            "expr": "process_resident_memory_bytes / 1024 / 1024",
+            "legendFormat": "Memory Usage (MB)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Usage",
+            "format": "short"
+          }
+        ]
+      }
+    ]
+  }
+}

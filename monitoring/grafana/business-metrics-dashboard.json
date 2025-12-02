@@ -1,0 +1,354 @@
+{
+  "dashboard": {
+    "title": "Enterprise Auth System - Business Metrics",
+    "tags": ["authentication", "business", "users"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "1m",
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "User Registrations",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(user_registrations_total[1h])",
+            "legendFormat": "Registrations/hour",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(user_registrations_total[24h])",
+            "legendFormat": "Total (24h)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Registrations",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "User Logins",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(user_logins_total{status=\"success\"}[1h])",
+            "legendFormat": "Successful Logins/hour",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(user_logins_total{status=\"failed\"}[1h])",
+            "legendFormat": "Failed Logins/hour",
+            "refId": "B"
+          },
+          {
+            "expr": "increase(user_logins_total{status=\"success\"}[24h])",
+            "legendFormat": "Total Successful (24h)",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Logins",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Login Success Rate",
+        "type": "singlestat",
+        "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "rate(user_logins_total{status=\"success\"}[1h]) / rate(user_logins_total[1h]) * 100",
+            "refId": "A"
+          }
+        ],
+        "format": "percent",
+        "valueName": "current",
+        "thresholds": "80,90",
+        "colors": ["#d44a3a", "#e0b400", "#299c46"]
+      },
+      {
+        "id": 4,
+        "title": "Active Sessions",
+        "type": "singlestat",
+        "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "active_sessions",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current",
+        "sparkline": {
+          "show": true,
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "fillColor": "rgba(31, 118, 189, 0.18)"
+        }
+      },
+      {
+        "id": 5,
+        "title": "MFA Enabled Users",
+        "type": "singlestat",
+        "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "increase(mfa_enablements_total[24h])",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current",
+        "sparkline": {
+          "show": true,
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "fillColor": "rgba(31, 118, 189, 0.18)"
+        }
+      },
+      {
+        "id": 6,
+        "title": "Password Resets",
+        "type": "singlestat",
+        "gridPos": { "x": 18, "y": 8, "w": 6, "h": 4 },
+        "targets": [
+          {
+            "expr": "increase(password_resets_total[24h])",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current",
+        "sparkline": {
+          "show": true,
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "fillColor": "rgba(31, 118, 189, 0.18)"
+        }
+      },
+      {
+        "id": 7,
+        "title": "Authentication Methods",
+        "type": "piechart",
+        "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (method) (increase(user_logins_total{status=\"success\"}[24h]))",
+            "legendFormat": "{{method}}",
+            "refId": "A"
+          }
+        ],
+        "pieType": "donut"
+      },
+      {
+        "id": 8,
+        "title": "Session Activity",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(session_creations_total[5m])",
+            "legendFormat": "Sessions Created",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(session_revocations_total[5m])",
+            "legendFormat": "Sessions Revoked",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Sessions/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Authentication Duration by Method",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(authentication_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} - p95",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ],
+        "alert": {
+          "name": "Slow Authentication",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.2],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Authentication p95 duration exceeds 200ms threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 10,
+        "title": "Authorization Check Duration",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(authorization_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(authorization_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ],
+        "alert": {
+          "name": "Slow Authorization",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.005],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Authorization p95 duration exceeds 5ms threshold",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 11,
+        "title": "Webhook Deliveries",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(webhook_deliveries_total{status=\"success\"}[5m])",
+            "legendFormat": "Successful",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(webhook_deliveries_total{status=\"failed\"}[5m])",
+            "legendFormat": "Failed",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(webhook_deliveries_total{status=\"retrying\"}[5m])",
+            "legendFormat": "Retrying",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Deliveries/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Webhook Delivery Duration",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(webhook_delivery_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(webhook_delivery_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "format": "s"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "User Growth Trend",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 36, "w": 24, "h": 8 },
+        "targets": [
+          {
+            "expr": "increase(user_registrations_total[1d])",
+            "legendFormat": "Daily Registrations",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "New Users",
+            "format": "short"
+          }
+        ]
+      }
+    ]
+  }
+}

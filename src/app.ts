@@ -157,6 +157,16 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     },
   });
 
+  // Metrics middleware - track request count and duration
+  // Requirements: 22.1
+  const { metricsMiddleware } = await import('./presentation/middleware/metrics.middleware.js');
+  app.addHook('onRequest', metricsMiddleware);
+
+  // Tracing middleware - create trace spans for all operations
+  // Requirements: 22.3
+  const { tracingMiddleware } = await import('./presentation/middleware/tracing.middleware.js');
+  app.addHook('onRequest', tracingMiddleware);
+
   // Request logging middleware
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     request.log.info(
@@ -215,6 +225,23 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       },
       'Request error'
     );
+
+    // Send alert for non-operational errors (Requirement 18.4)
+    if (error instanceof ApplicationError && !error.isOperational) {
+      const { alertingService, AlertSeverity } = await import('./core/monitoring/alerting.service.js');
+      await alertingService.alertSecurityEvent(
+        'non_operational_error',
+        AlertSeverity.CRITICAL,
+        `Non-operational error: ${error.message}`,
+        {
+          requestId,
+          userId,
+          errorName: error.name,
+          url: request.url,
+          method: request.method,
+        }
+      );
+    }
 
     // Handle ApplicationError
     if (error instanceof ApplicationError) {
@@ -350,6 +377,12 @@ export async function gracefulShutdown(app: FastifyInstance): Promise<void> {
 
     await app.close();
     logger.info('Server closed successfully');
+
+    // Shutdown distributed tracing (Requirement 22.3)
+    const { shutdownTracing } = await import('./core/monitoring/tracing.js');
+    await shutdownTracing();
+    logger.info('Distributed tracing shutdown complete');
+
     process.exit(0);
   } catch (error) {
     logger.error('Error during graceful shutdown:', error);

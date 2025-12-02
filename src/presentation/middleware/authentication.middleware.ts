@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
 import { AuthenticationError } from '../../core/errors/types/application-error.js';
+import { userContextStorage } from '../../core/logging/logger.js';
 
 export interface TokenPayload {
   userId: string;
@@ -73,6 +74,9 @@ export async function authenticationMiddleware(
 
     // Attach user to request
     (request as AuthenticatedRequest).user = decoded;
+
+    // Set user context for logging (Requirement 22.2)
+    userContextStorage.enterWith({ userId: decoded.userId, email: decoded.email });
   } catch (error) {
     if (error instanceof AuthenticationError) {
       throw error;
@@ -108,6 +112,9 @@ export async function optionalAuthenticationMiddleware(
 
     if (decoded.userId && decoded.email) {
       (request as AuthenticatedRequest).user = decoded;
+
+      // Set user context for logging (Requirement 22.2)
+      userContextStorage.enterWith({ userId: decoded.userId, email: decoded.email });
     }
   } catch (error) {
     // Silently fail for optional authentication

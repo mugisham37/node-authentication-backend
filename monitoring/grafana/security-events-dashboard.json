@@ -1,0 +1,460 @@
+{
+  "dashboard": {
+    "title": "Enterprise Auth System - Security Events",
+    "tags": ["authentication", "security", "monitoring"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Security Events Overview",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 0, "w": 24, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(security_events_total[5m])",
+            "legendFormat": "{{event_type}} - {{severity}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Events/sec",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "High Security Event Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [50],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Security event rate is abnormally high",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 2,
+        "title": "Failed Login Attempts",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(failed_login_attempts_total[5m])",
+            "legendFormat": "{{reason}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Failed Attempts/sec",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "High Failed Login Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [10],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Failed login attempt rate exceeds threshold - possible brute force attack",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 3,
+        "title": "Account Lockouts",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(account_lockouts_total[5m])",
+            "legendFormat": "Lockouts/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "increase(account_lockouts_total[1h])",
+            "legendFormat": "Total (1h)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Lockouts",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "High Account Lockout Rate",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [5],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Account lockout rate is abnormally high",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 4,
+        "title": "Rate Limit Violations",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(rate_limit_exceeded_total[5m])",
+            "legendFormat": "{{endpoint}} - {{identifier_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Violations/sec",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "High Rate Limit Violations",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [20],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Rate limit violation rate is abnormally high - possible DoS attack",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 5,
+        "title": "Security Events by Severity",
+        "type": "piechart",
+        "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (severity) (increase(security_events_total[1h]))",
+            "legendFormat": "{{severity}}",
+            "refId": "A"
+          }
+        ],
+        "pieType": "donut"
+      },
+      {
+        "id": 6,
+        "title": "Critical Security Events",
+        "type": "table",
+        "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
+        "targets": [
+          {
+            "expr": "security_events_total{severity=\"critical\"}",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "event_type": "Event Type",
+                "user_id": "User ID",
+                "ip_address": "IP Address",
+                "timestamp": "Timestamp"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Authentication Attempts by IP",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 32, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "topk(10, rate(user_logins_total[5m]))",
+            "legendFormat": "{{ip_address}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Attempts/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Suspicious Activity Indicators",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 32, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(security_events_total{event_type=\"impossible_travel\"}[5m])",
+            "legendFormat": "Impossible Travel",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(security_events_total{event_type=\"unusual_location\"}[5m])",
+            "legendFormat": "Unusual Location",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(security_events_total{event_type=\"new_device\"}[5m])",
+            "legendFormat": "New Device",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(security_events_total{event_type=\"credential_stuffing\"}[5m])",
+            "legendFormat": "Credential Stuffing",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Events/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "MFA Verification Failures",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 40, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(security_events_total{event_type=\"mfa_verification_failed\"}[5m])",
+            "legendFormat": "{{method}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Failures/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Password Reset Requests",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 40, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(password_resets_total[5m])",
+            "legendFormat": "Reset Requests",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Requests/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Session Anomalies",
+        "type": "graph",
+        "gridPos": { "x": 0, "y": 48, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(security_events_total{event_type=\"session_hijacking_attempt\"}[5m])",
+            "legendFormat": "Session Hijacking Attempts",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(security_events_total{event_type=\"token_reuse_detected\"}[5m])",
+            "legendFormat": "Token Reuse Detected",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Events/sec",
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "Session Security Anomaly",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Session security anomaly detected - possible attack",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 12,
+        "title": "Authorization Failures",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 48, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "rate(authorization_checks_total{result=\"denied\"}[5m])",
+            "legendFormat": "{{resource}} - {{action}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Denials/sec",
+            "format": "short"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Top Failed Login IPs",
+        "type": "table",
+        "gridPos": { "x": 0, "y": 56, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "topk(20, sum by (ip_address) (increase(failed_login_attempts_total[1h])))",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "ip_address": "IP Address",
+                "Value": "Failed Attempts (1h)"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Security Event Timeline",
+        "type": "graph",
+        "gridPos": { "x": 12, "y": 56, "w": 12, "h": 8 },
+        "targets": [
+          {
+            "expr": "sum by (event_type) (rate(security_events_total{severity=~\"high|critical\"}[5m]))",
+            "legendFormat": "{{event_type}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "High/Critical Events/sec",
+            "format": "short"
+          }
+        ]
+      }
+    ]
+  }
+}
