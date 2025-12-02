@@ -1,19 +1,34 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 import { logger } from '../logging/logger.js';
-import type { SendEmailInput } from '../../application/services/email.service.js';
+import {
+  EMAIL_JOB_TYPES,
+  EmailJobType,
+  EmailVerificationJobData,
+  PasswordResetJobData,
+  SecurityAlertJobData,
+  WelcomeEmailJobData,
+} from './jobs/email-jobs.js';
+import { EmailProcessor } from './processors/email-processor.js';
+import type { IEmailService } from '../../application/services/email.service.js';
 
-export interface EmailJobData extends SendEmailInput {
-  retryCount?: number;
-}
+export type EmailJobData =
+  | EmailVerificationJobData
+  | PasswordResetJobData
+  | SecurityAlertJobData
+  | WelcomeEmailJobData;
 
 export class EmailQueue {
   private queue: Queue<EmailJobData>;
   private worker: Worker<EmailJobData> | null = null;
   private connection: Redis;
+  private processor: EmailProcessor | null = null;
 
-  constructor(redisConnection: Redis) {
+  constructor(redisConnection: Redis, emailService?: IEmailService) {
     this.connection = redisConnection;
+    if (emailService) {
+      this.processor = new EmailProcessor(emailService);
+    }
 
     this.queue = new Queue<EmailJobData>('email', {
       connection: this.connection,
@@ -34,58 +49,79 @@ export class EmailQueue {
     });
   }
 
-  async addEmailJob(data: EmailJobData): Promise<void> {
+  /**
+   * Add email verification job
+   * Requirement: 1.6, 2.1
+   */
+  async addVerificationEmail(data: EmailVerificationJobData): Promise<void> {
+    await this.addJob(EMAIL_JOB_TYPES.VERIFICATION, data, 2);
+  }
+
+  /**
+   * Add password reset email job
+   * Requirement: 10.1
+   */
+  async addPasswordResetEmail(data: PasswordResetJobData): Promise<void> {
+    await this.addJob(EMAIL_JOB_TYPES.PASSWORD_RESET, data, 3);
+  }
+
+  /**
+   * Add security alert email job
+   * Requirement: 13.4
+   */
+  async addSecurityAlertEmail(data: SecurityAlertJobData): Promise<void> {
+    await this.addJob(EMAIL_JOB_TYPES.SECURITY_ALERT, data, 1); // Highest priority
+  }
+
+  /**
+   * Add welcome email job
+   * Requirement: 1.6
+   */
+  async addWelcomeEmail(data: WelcomeEmailJobData): Promise<void> {
+    await this.addJob(EMAIL_JOB_TYPES.WELCOME, data, 5); // Lowest priority
+  }
+
+  /**
+   * Internal method to add job to queue
+   */
+  private async addJob(jobType: EmailJobType, data: EmailJobData, priority: number): Promise<void> {
     try {
-      await this.queue.add('send-email', data, {
-        priority: this.getPriority(data),
+      await this.queue.add(jobType, data, {
+        priority,
       });
 
       logger.info('Email job added to queue', {
+        jobType,
         to: data.to,
-        subject: data.subject,
       });
     } catch (error) {
       logger.error('Failed to add email job to queue', {
         error,
+        jobType,
         to: data.to,
-        subject: data.subject,
       });
       throw error;
     }
   }
 
-  startWorker(processor: (job: Job<EmailJobData>) => Promise<void>): void {
+  /**
+   * Start the email worker
+   * Processes email jobs from the queue
+   */
+  startWorker(): void {
     if (this.worker) {
       logger.warn('Email worker already started');
       return;
     }
 
+    if (!this.processor) {
+      throw new Error('Email processor not initialized. Provide emailService in constructor.');
+    }
+
     this.worker = new Worker<EmailJobData>(
       'email',
       async (job: Job<EmailJobData>) => {
-        try {
-          logger.info('Processing email job', {
-            jobId: job.id,
-            to: job.data.to,
-            subject: job.data.subject,
-            attempt: job.attemptsMade + 1,
-          });
-
-          await processor(job);
-
-          logger.info('Email job completed', {
-            jobId: job.id,
-            to: job.data.to,
-          });
-        } catch (error) {
-          logger.error('Email job failed', {
-            jobId: job.id,
-            to: job.data.to,
-            error,
-            attempt: job.attemptsMade + 1,
-          });
-          throw error;
-        }
+        await this.processor!.process(job);
       },
       {
         connection: this.connection,
@@ -116,19 +152,7 @@ export class EmailQueue {
     logger.info('Email queue closed');
   }
 
-  private getPriority(data: EmailJobData): number {
-    // Higher priority for security alerts and verification emails
-    if (data.subject.toLowerCase().includes('security')) {
-      return 1; // Highest priority
-    }
-    if (data.subject.toLowerCase().includes('verify')) {
-      return 2;
-    }
-    if (data.subject.toLowerCase().includes('reset')) {
-      return 3;
-    }
-    return 5; // Default priority
-  }
+
 
   async getQueueMetrics(): Promise<{
     waiting: number;
