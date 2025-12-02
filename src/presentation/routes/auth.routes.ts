@@ -19,6 +19,25 @@ import {
   authenticationRateLimiter,
   passwordResetRateLimiter,
 } from '../middleware/rate-limit.middleware.js';
+import {
+  registerRequestSchema,
+  registerResponseSchema,
+  loginRequestSchema,
+  loginResponseSchema,
+  mfaChallengeResponseSchema,
+  refreshTokenRequestSchema,
+  refreshTokenResponseSchema,
+  verifyEmailRequestSchema,
+  messageResponseSchema,
+  forgotPasswordRequestSchema,
+  resetPasswordRequestSchema,
+  currentUserResponseSchema,
+  errorResponseSchema,
+  unauthorizedResponseSchema,
+  rateLimitResponseSchema,
+  authenticationTag,
+  bearerAuthSecurity,
+} from '../schemas/openapi-schemas.js';
 
 /**
  * Register authentication routes
@@ -33,6 +52,20 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/register',
     {
+      schema: {
+        description: 'Register a new user account with email and password',
+        tags: authenticationTag,
+        body: registerRequestSchema,
+        response: {
+          201: registerResponseSchema,
+          400: errorResponseSchema,
+          409: {
+            ...errorResponseSchema,
+            description: 'Conflict - Email already registered',
+          },
+          429: rateLimitResponseSchema,
+        },
+      },
       preHandler: [registrationRateLimiter, validateRequest({ body: registerBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -72,6 +105,20 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/login',
     {
+      schema: {
+        description:
+          'Authenticate with email and password. Returns MFA challenge if MFA is enabled.',
+        tags: authenticationTag,
+        body: loginRequestSchema,
+        response: {
+          200: {
+            description: 'Successful login or MFA challenge',
+            oneOf: [loginResponseSchema, mfaChallengeResponseSchema],
+          },
+          401: unauthorizedResponseSchema,
+          429: rateLimitResponseSchema,
+        },
+      },
       preHandler: [authenticationRateLimiter, validateRequest({ body: loginBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -122,6 +169,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/logout',
     {
+      schema: {
+        description: 'Logout and terminate current session',
+        tags: authenticationTag,
+        security: bearerAuthSecurity,
+        response: {
+          200: messageResponseSchema,
+          401: unauthorizedResponseSchema,
+        },
+      },
       preHandler: [authenticationMiddleware],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -145,6 +201,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/refresh',
     {
+      schema: {
+        description:
+          'Obtain new access token using refresh token. Old refresh token is invalidated.',
+        tags: authenticationTag,
+        body: refreshTokenRequestSchema,
+        response: {
+          200: refreshTokenResponseSchema,
+          401: unauthorizedResponseSchema,
+        },
+      },
       preHandler: [validateRequest({ body: refreshTokenBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -166,6 +232,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/verify-email',
     {
+      schema: {
+        description: 'Verify email address using token from verification email',
+        tags: authenticationTag,
+        body: verifyEmailRequestSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponseSchema,
+        },
+      },
       preHandler: [validateRequest({ body: verifyEmailBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -186,6 +261,16 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/password/forgot',
     {
+      schema: {
+        description:
+          'Request password reset email. Always returns success to prevent email enumeration.',
+        tags: authenticationTag,
+        body: forgotPasswordRequestSchema,
+        response: {
+          200: messageResponseSchema,
+          429: rateLimitResponseSchema,
+        },
+      },
       preHandler: [passwordResetRateLimiter, validateRequest({ body: forgotPasswordBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -207,6 +292,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/password/reset',
     {
+      schema: {
+        description:
+          'Reset password using token from reset email. Terminates all sessions except current.',
+        tags: authenticationTag,
+        body: resetPasswordRequestSchema,
+        response: {
+          200: messageResponseSchema,
+          400: errorResponseSchema,
+          429: rateLimitResponseSchema,
+        },
+      },
       preHandler: [passwordResetRateLimiter, validateRequest({ body: resetPasswordBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -230,6 +326,15 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/api/v1/auth/me',
     {
+      schema: {
+        description: 'Get current authenticated user profile',
+        tags: authenticationTag,
+        security: bearerAuthSecurity,
+        response: {
+          200: currentUserResponseSchema,
+          401: unauthorizedResponseSchema,
+        },
+      },
       preHandler: [authenticationMiddleware],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

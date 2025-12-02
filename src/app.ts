@@ -5,7 +5,10 @@ import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import compress from '@fastify/compress';
 import etag from '@fastify/etag';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 import { env } from './config/env.js';
+import { swaggerConfig, swaggerUiConfig } from './config/swagger.config.js';
 import { logger } from './core/logging/logger.js';
 import { ApplicationError } from './core/errors/types/application-error.js';
 import { randomUUID } from 'crypto';
@@ -39,12 +42,18 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Required for Swagger UI
         imgSrc: ["'self'", 'data:', 'https:'],
       },
     },
     crossOriginEmbedderPolicy: false,
   });
+
+  // Register Swagger for OpenAPI documentation (Requirements: 23.1, 23.2)
+  await app.register(swagger, swaggerConfig);
+
+  // Register Swagger UI (Requirements: 23.3)
+  await app.register(swaggerUi, swaggerUiConfig);
 
   // Register compression for response optimization (Requirement: 19.1)
   await app.register(compress, {
