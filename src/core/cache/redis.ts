@@ -320,6 +320,65 @@ function updateCacheHitRate(): void {
 }
 
 /**
+ * Check Redis connection health
+ * Requirement: 19.4
+ */
+export async function checkHealth(): Promise<{
+  healthy: boolean;
+  latency: number;
+}> {
+  const startTime = Date.now();
+
+  try {
+    const client = getRedis();
+    await client.ping();
+    const latency = Date.now() - startTime;
+
+    return {
+      healthy: true,
+      latency,
+    };
+  } catch (error) {
+    log.error('Redis health check failed', error as Error);
+    return {
+      healthy: false,
+      latency: Date.now() - startTime,
+    };
+  }
+}
+
+/**
+ * Get Redis connection info
+ * Requirement: 19.4
+ */
+export async function getConnectionInfo(): Promise<{
+  connected: boolean;
+  mode: 'standalone' | 'cluster';
+  uptime?: number;
+}> {
+  try {
+    const client = getRedis();
+    const info = await client.info('server');
+
+    // Parse uptime from info string
+    const uptimeMatch = info.match(/uptime_in_seconds:(\d+)/);
+    const uptime = uptimeMatch ? parseInt(uptimeMatch[1], 10) : undefined;
+
+    return {
+      connected: true,
+      mode: client instanceof Redis ? 'standalone' : 'cluster',
+      uptime,
+    };
+  } catch (error) {
+    log.error('Failed to get Redis connection info', error as Error);
+    return {
+      connected: false,
+      mode: 'standalone',
+    };
+  }
+}
+
+/**
  * Close the Redis connection
  */
 export async function closeRedis(): Promise<void> {
@@ -344,5 +403,7 @@ export default {
   sadd,
   sismember,
   smembers,
+  checkHealth,
+  getConnectionInfo,
   closeRedis,
 };

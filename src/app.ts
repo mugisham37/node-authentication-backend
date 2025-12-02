@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
+import compress from '@fastify/compress';
+import etag from '@fastify/etag';
 import { env } from './config/env.js';
 import { logger } from './core/logging/logger.js';
 import { ApplicationError } from './core/errors/types/application-error.js';
@@ -42,6 +44,21 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       },
     },
     crossOriginEmbedderPolicy: false,
+  });
+
+  // Register compression for response optimization (Requirement: 19.1)
+  await app.register(compress, {
+    global: true,
+    threshold: 1024, // Only compress responses larger than 1KB
+    encodings: ['gzip', 'deflate'],
+    zlibOptions: {
+      level: 6, // Balanced compression level
+    },
+  });
+
+  // Register ETag support for cacheable responses (Requirement: 19.1)
+  await app.register(etag, {
+    algorithm: 'fnv1a', // Fast hash algorithm
   });
 
   // Register rate limiting

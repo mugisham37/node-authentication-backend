@@ -121,6 +121,77 @@ function updateConnectionMetrics(): void {
 }
 
 /**
+ * Check database connection health
+ * Requirement: 19.4
+ */
+export async function checkHealth(): Promise<{
+  healthy: boolean;
+  latency: number;
+  poolStats: {
+    total: number;
+    idle: number;
+    waiting: number;
+  };
+}> {
+  const startTime = Date.now();
+
+  try {
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('SELECT 1');
+      const latency = Date.now() - startTime;
+
+      return {
+        healthy: true,
+        latency,
+        poolStats: {
+          total: pool.totalCount,
+          idle: pool.idleCount,
+          waiting: pool.waitingCount,
+        },
+      };
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    log.error('Database health check failed', error as Error);
+    return {
+      healthy: false,
+      latency: Date.now() - startTime,
+      poolStats: {
+        total: 0,
+        idle: 0,
+        waiting: 0,
+      },
+    };
+  }
+}
+
+/**
+ * Get connection pool statistics
+ * Requirement: 19.4
+ */
+export function getPoolStats(): {
+  total: number;
+  idle: number;
+  waiting: number;
+  max: number;
+} {
+  if (!pool) {
+    return { total: 0, idle: 0, waiting: 0, max: 0 };
+  }
+
+  return {
+    total: pool.totalCount,
+    idle: pool.idleCount,
+    waiting: pool.waitingCount,
+    max: databaseConfig.max,
+  };
+}
+
+/**
  * Close the PostgreSQL connection pool
  */
 export async function closePostgres(): Promise<void> {
@@ -138,5 +209,7 @@ export default {
   getDatabase,
   query,
   transaction,
+  checkHealth,
+  getPoolStats,
   closePostgres,
 };
