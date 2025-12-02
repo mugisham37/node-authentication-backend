@@ -80,11 +80,11 @@ function cleanupFallbackCache(): void {
   const now = Date.now();
   const keysToDelete: string[] = [];
 
-  for (const [key, entry] of fallbackCache.entries()) {
+  fallbackCache.forEach((entry, key) => {
     if (entry.expiresAt <= now) {
       keysToDelete.push(key);
     }
-  }
+  });
 
   for (const key of keysToDelete) {
     fallbackCache.delete(key);
@@ -283,11 +283,11 @@ export async function deletePatternWithFallback(pattern: string): Promise<void> 
   const regex = new RegExp(pattern.replace(/\*/g, '.*'));
   const keysToDelete: string[] = [];
 
-  for (const key of fallbackCache.keys()) {
+  fallbackCache.forEach((_entry, key) => {
     if (regex.test(key)) {
       keysToDelete.push(key);
     }
-  }
+  });
 
   for (const key of keysToDelete) {
     fallbackCache.delete(key);
@@ -343,8 +343,7 @@ export async function incrWithFallback(key: string): Promise<number> {
 
   // Use fallback cache
   const entry = fallbackCache.get(key);
-  const currentValue =
-    entry && entry.expiresAt > Date.now() ? (entry.value as number) : 0;
+  const currentValue = entry && entry.expiresAt > Date.now() ? (entry.value as number) : 0;
   const newValue = currentValue + 1;
 
   fallbackCache.set(key, {
