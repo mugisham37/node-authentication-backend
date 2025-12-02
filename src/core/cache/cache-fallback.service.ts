@@ -30,7 +30,7 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
-const fallbackCache = new Map<string, CacheEntry<any>>();
+const fallbackCache = new Map<string, CacheEntry<unknown>>();
 let cacheAvailable = true;
 let lastCacheCheckTime = 0;
 const CACHE_CHECK_INTERVAL = 5000; // Check cache health every 5 seconds
@@ -172,7 +172,7 @@ export async function getWithFallback<T>(
 
     if (fallbackEntry && fallbackEntry.expiresAt > Date.now()) {
       logger.debug('Serving from fallback cache', { key });
-      return fallbackEntry.value;
+      return fallbackEntry.value as T;
     }
 
     // Compute value
@@ -343,7 +343,8 @@ export async function incrWithFallback(key: string): Promise<number> {
 
   // Use fallback cache
   const entry = fallbackCache.get(key);
-  const currentValue = entry && entry.expiresAt > Date.now() ? (entry.value as number) : 0;
+  const currentValue =
+    entry && entry.expiresAt > Date.now() ? (entry.value as number) : 0;
   const newValue = currentValue + 1;
 
   fallbackCache.set(key, {
