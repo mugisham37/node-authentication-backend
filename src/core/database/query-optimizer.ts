@@ -235,9 +235,7 @@ export class QueryOptimizer {
     }
 
     // Load all relations in parallel
-    const relationMaps = await Promise.all(
-      relations.map((relation) => relation.loader(entities))
-    );
+    const relationMaps = await Promise.all(relations.map((relation) => relation.loader(entities)));
 
     // Attach relations to entities
     return entities.map((entity) => {

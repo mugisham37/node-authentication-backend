@@ -361,8 +361,9 @@ export async function getConnectionInfo(): Promise<{
     const info = await client.info('server');
 
     // Parse uptime from info string
-    const uptimeMatch = info.match(/uptime_in_seconds:(\d+)/);
-    const uptime = uptimeMatch ? parseInt(uptimeMatch[1], 10) : undefined;
+    const infoStr = info || '';
+    const uptimeMatch = infoStr.match(/uptime_in_seconds:(\d+)/);
+    const uptime = uptimeMatch && uptimeMatch[1] ? parseInt(uptimeMatch[1], 10) : undefined;
 
     return {
       connected: true,

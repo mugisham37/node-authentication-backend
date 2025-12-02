@@ -13,19 +13,19 @@ export const databaseConfig = {
   user: process.env['DB_USER'] || 'postgres',
   password: process.env['DB_PASSWORD'] || 'postgres',
   ssl: process.env['DB_SSL'] === 'true' ? { rejectUnauthorized: false } : false,
-  
+
   // Connection pool settings (Requirement: 19.4)
   max: parseInt(process.env['DB_POOL_MAX'] || '20', 10), // Maximum 20 connections
   min: parseInt(process.env['DB_POOL_MIN'] || '2', 10), // Minimum 2 connections
   idleTimeoutMillis: parseInt(process.env['DB_IDLE_TIMEOUT'] || '30000', 10), // 30 seconds
   connectionTimeoutMillis: parseInt(process.env['DB_CONNECTION_TIMEOUT'] || '5000', 10), // 5 seconds
-  
+
   // Statement timeout to prevent long-running queries
   statement_timeout: parseInt(process.env['DB_STATEMENT_TIMEOUT'] || '30000', 10), // 30 seconds
-  
+
   // Query timeout
   query_timeout: parseInt(process.env['DB_QUERY_TIMEOUT'] || '30000', 10), // 30 seconds
-  
+
   // Application name for monitoring
   application_name: process.env['DB_APPLICATION_NAME'] || 'enterprise-auth-system',
 };
@@ -40,7 +40,7 @@ export const redisConfig = {
   password: process.env['REDIS_PASSWORD'] || undefined,
   db: parseInt(process.env['REDIS_DB'] || '0', 10),
   keyPrefix: process.env['REDIS_KEY_PREFIX'] || 'auth:',
-  
+
   // Connection pool settings (Requirement: 19.4)
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
@@ -48,13 +48,13 @@ export const redisConfig = {
   connectTimeout: 5000, // 5 seconds
   commandTimeout: 5000, // 5 seconds
   keepAlive: 30000, // 30 seconds
-  
+
   // Retry strategy with exponential backoff
   retryStrategy: (times: number) => {
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
-  
+
   // Reconnect on specific errors
   reconnectOnError: (err: Error) => {
     const targetError = 'READONLY';
@@ -64,10 +64,10 @@ export const redisConfig = {
     }
     return false;
   },
-  
+
   // Lazy connect - don't connect until first command
   lazyConnect: false,
-  
+
   // Auto-pipelining for better performance
   enableAutoPipelining: true,
   autoPipeliningIgnoredCommands: ['ping'],
