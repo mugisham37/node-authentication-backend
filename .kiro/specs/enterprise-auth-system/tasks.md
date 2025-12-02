@@ -277,7 +277,17 @@
 
 ## Phase 7: Application Layer - Passwordless & OAuth
 
-- [ ] 7. Implement passwordless authentication
+- [x] 7. Implement passwordless authentication
+
+
+
+
+
+
+
+
+
+
   - Create magic link token generation
   - Store magic link tokens in Redis with expiration
   - Implement magic link verification and session creation
@@ -293,7 +303,9 @@
   - **Property 40: WebAuthn registration stores credential**
   - **Validates: Requirements 8.1, 8.2, 8.4, 8.5, 8.6**
 
-- [ ] 7.2 Implement OAuth service
+- [x] 7.2 Implement OAuth service
+
+
   - Create IOAuthService interface
   - Implement OAuth authorization URL generation with PKCE
   - Implement OAuth callback handling and code exchange
@@ -315,7 +327,10 @@
 
 ## Phase 8: Application Layer - Authorization
 
-- [ ] 8. Implement authorization service
+- [-] 8. Implement authorization service
+
+
+
   - Create IAuthorizationService interface
   - Implement permission checking logic
   - Implement role assignment and removal

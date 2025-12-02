@@ -39,3 +39,32 @@ export {
   type SessionOutput,
   type SessionListOutput,
 } from './session.service.js';
+
+export {
+  OAuthService,
+  type IOAuthService,
+  type OAuthProviderConfig,
+  type OAuthProfile,
+  type GenerateAuthUrlInput,
+  type GenerateAuthUrlOutput,
+  type HandleCallbackInput,
+  type HandleCallbackOutput,
+} from './oauth.service.js';
+
+export {
+  PasswordlessService,
+  type IPasswordlessService,
+  type RequestMagicLinkInput,
+  type RequestMagicLinkOutput,
+  type VerifyMagicLinkInput,
+  type VerifyMagicLinkOutput,
+  type RegisterWebAuthnCredentialInput,
+  type RegisterWebAuthnCredentialOutput,
+  type AuthenticateWithWebAuthnInput,
+  type AuthenticateWithWebAuthnOutput,
+} from './passwordless.service.js';
+
+export {
+  AuthorizationService,
+  type IAuthorizationService,
+} from './authorization.service.js';
