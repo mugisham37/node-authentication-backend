@@ -91,3 +91,26 @@ export {
   type RegisterDeviceOutput,
   type DeviceListItem,
 } from './device.service.js';
+
+export {
+  type IEmailService,
+  type SendEmailInput,
+  type VerificationEmailInput,
+  type PasswordResetEmailInput,
+  type SecurityAlertEmailInput,
+  type WelcomeEmailInput,
+} from './email.service.js';
+
+export { type ISMSService, type SendSMSInput } from './sms.service.js';
+
+export {
+  type IRateLimitService,
+  type RateLimitConfig,
+  type RateLimitResult,
+} from './rate-limit.service.js';
+
+export {
+  type IWebhookDeliveryService,
+  type WebhookEvent,
+  type WebhookDeliveryResult,
+} from './webhook-delivery.service.js';

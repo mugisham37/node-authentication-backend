@@ -162,6 +162,15 @@ export function resolve<T>(name: string): T {
   return container.resolve<T>(name);
 }
 
+// Export container instance for convenience
+export const container = {
+  resolve: <T>(name: string): T => resolve<T>(name),
+  register: registerValue,
+  registerClass,
+  getContainer,
+  resetContainer,
+};
+
 export default {
   buildContainer,
   getContainer,

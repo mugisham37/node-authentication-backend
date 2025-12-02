@@ -504,7 +504,12 @@
 
 ## Phase 11: Infrastructure Layer - External Services
 
-- [ ] 11. Implement email service
+- [x] 11. Implement email service
+
+
+
+
+
   - Create IEmailService interface
   - Implement email sending with Nodemailer
   - Create email templates for verification, password reset, security alerts
@@ -513,12 +518,16 @@
   - Queue email jobs with BullMQ
   - _Requirements: 1.6, 2.1, 10.1_
 
-- [ ] 11.1 Implement SMS service
+- [x] 11.1 Implement SMS service
+
+
   - Create ISMSService interface
   - Implement SMS sending with Twilio
   - Implement phone number validation
   - Implement retry logic
   - _Requirements: 4.2_
+
+
 
 - [ ] 11.2 Implement rate limiting service
   - Create IRateLimitService interface
@@ -534,6 +543,8 @@
   - **Property 72: Password reset rate limit**
   - **Property 73: Registration rate limit**
   - **Property 74: MFA verification rate limit**
+
+
   - **Property 75: High trust relaxed limits**
   - **Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.5, 14.7**
 
@@ -550,6 +561,8 @@
   - **Property 82: Webhook creation generates secret**
   - **Property 83: Event triggers webhook**
   - **Property 84: Webhook retry on failure**
+
+
   - **Property 85: Webhook signature inclusion**
   - **Property 86: Webhook list ownership**
   - **Property 87: Webhook deletion stops events**
@@ -570,7 +583,10 @@
 
 ## Phase 12: Presentation Layer - API Routes
 
-- [ ] 12. Set up Fastify server and middleware
+- [-] 12. Set up Fastify server and middleware
+
+
+
   - Create Fastify application with TypeScript
   - Configure CORS with helmet
   - Configure security headers with helmet
@@ -580,32 +596,42 @@
   - Set up graceful shutdown
   - _Requirements: All_
 
-- [ ] 12.1 Implement authentication middleware
+- [x] 12.1 Implement authentication middleware
+
+
   - Create JWT verification middleware
   - Extract and validate access tokens
   - Attach user to request context
   - Handle expired and invalid tokens
   - _Requirements: 6.1, 12.1_
 
-- [ ] 12.2 Implement authorization middleware
+- [x] 12.2 Implement authorization middleware
+
+
   - Create permission checking middleware
   - Verify user has required permissions
   - Support resource and action-based checks
   - _Requirements: 12.1, 12.2_
 
-- [ ] 12.3 Implement rate limiting middleware
+- [x] 12.3 Implement rate limiting middleware
+
+
   - Integrate rate limiting service
   - Apply endpoint-specific limits
   - Return proper retry-after headers
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-- [ ] 12.4 Implement request validation middleware
+- [x] 12.4 Implement request validation middleware
+
+
   - Create Zod schema validation middleware
   - Validate request body, query, and params
   - Return structured validation errors
   - _Requirements: 1.3, 1.4, All validation requirements_
 
-- [ ] 12.5 Implement authentication routes
+- [x] 12.5 Implement authentication routes
+
+
   - POST /api/v1/auth/register - User registration
   - POST /api/v1/auth/login - Email/password login
   - POST /api/v1/auth/logout - Logout current session
@@ -616,19 +642,26 @@
   - GET /api/v1/auth/me - Get current user profile
   - _Requirements: 1.1, 2.1, 3.1, 3.2, 6.1, 7.3, 10.1, 10.2_
 
+
+
 - [ ] 12.6 Implement MFA routes
   - POST /api/v1/auth/mfa/setup - Enable MFA (TOTP or SMS)
   - POST /api/v1/auth/mfa/verify - Verify MFA code during login
   - POST /api/v1/auth/mfa/disable - Disable MFA
+
+
   - GET /api/v1/auth/mfa/backup-codes - Get backup codes
   - _Requirements: 4.1, 4.2, 4.3, 4.6, 5.1_
 
 - [ ] 12.7 Implement passwordless routes
   - POST /api/v1/auth/magic-link - Request magic link
+
+
   - GET /api/v1/auth/magic-link/verify - Verify magic link
   - POST /api/v1/auth/webauthn/register - Register WebAuthn credential
   - POST /api/v1/auth/webauthn/authenticate - Authenticate with WebAuthn
   - _Requirements: 8.1, 8.2, 8.5, 8.6_
+
 
 - [ ] 12.8 Implement OAuth routes
   - GET /api/v1/oauth/:provider/authorize - Initiate OAuth flow
@@ -637,13 +670,15 @@
   - DELETE /api/v1/oauth/accounts/:id - Unlink OAuth account
   - _Requirements: 9.1, 9.2, 9.7_
 
-- [ ] 12.9 Implement session management routes
+- [x] 12.9 Implement session management routes
+
   - GET /api/v1/sessions - List user sessions
   - DELETE /api/v1/sessions/:id - Revoke specific session
   - DELETE /api/v1/sessions - Revoke all sessions except current
   - _Requirements: 7.1, 7.2_
 
-- [ ] 12.10 Implement device management routes
+- [-] 12.10 Implement device management routes
+
   - GET /api/v1/devices - List user devices
   - PUT /api/v1/devices/:id/trust - Mark device as trusted
   - DELETE /api/v1/devices/:id - Remove device
