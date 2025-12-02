@@ -33,10 +33,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/register',
     {
-      preHandler: [
-        registrationRateLimiter,
-        validateRequest({ body: registerBodySchema }),
-      ],
+      preHandler: [registrationRateLimiter, validateRequest({ body: registerBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { email, password, name, image } = request.body as {
@@ -75,10 +72,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/login',
     {
-      preHandler: [
-        authenticationRateLimiter,
-        validateRequest({ body: loginBodySchema }),
-      ],
+      preHandler: [authenticationRateLimiter, validateRequest({ body: loginBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { email, password } = request.body as {
@@ -192,10 +186,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/password/forgot',
     {
-      preHandler: [
-        passwordResetRateLimiter,
-        validateRequest({ body: forgotPasswordBodySchema }),
-      ],
+      preHandler: [passwordResetRateLimiter, validateRequest({ body: forgotPasswordBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { email } = request.body as { email: string };
@@ -216,10 +207,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/password/reset',
     {
-      preHandler: [
-        passwordResetRateLimiter,
-        validateRequest({ body: resetPasswordBodySchema }),
-      ],
+      preHandler: [passwordResetRateLimiter, validateRequest({ body: resetPasswordBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { token, password } = request.body as {

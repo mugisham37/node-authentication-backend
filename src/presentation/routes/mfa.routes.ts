@@ -26,10 +26,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/mfa/setup',
     {
-      preHandler: [
-        authenticationMiddleware,
-        validateRequest({ body: setupMfaBodySchema }),
-      ],
+      preHandler: [authenticationMiddleware, validateRequest({ body: setupMfaBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authRequest = request as AuthenticatedRequest;
@@ -75,10 +72,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/mfa/verify',
     {
-      preHandler: [
-        mfaVerificationRateLimiter,
-        validateRequest({ body: verifyMfaBodySchema }),
-      ],
+      preHandler: [mfaVerificationRateLimiter, validateRequest({ body: verifyMfaBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { challengeId, code } = request.body as {
@@ -115,10 +109,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
   app.post(
     '/api/v1/auth/mfa/disable',
     {
-      preHandler: [
-        authenticationMiddleware,
-        validateRequest({ body: disableMfaBodySchema }),
-      ],
+      preHandler: [authenticationMiddleware, validateRequest({ body: disableMfaBodySchema })],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authRequest = request as AuthenticatedRequest;

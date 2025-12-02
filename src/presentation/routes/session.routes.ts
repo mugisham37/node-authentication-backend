@@ -1,7 +1,10 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { container } from '../../core/container/container.js';
 import { ISessionService } from '../../application/services/session.service.js';
-import { authenticationMiddleware, AuthenticatedRequest } from '../middleware/authentication.middleware.js';
+import {
+  authenticationMiddleware,
+  AuthenticatedRequest,
+} from '../middleware/authentication.middleware.js';
 import { validateRequest, idParamSchema } from '../middleware/validation.middleware.js';
 
 /**

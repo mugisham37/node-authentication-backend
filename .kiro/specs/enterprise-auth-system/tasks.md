@@ -677,18 +677,23 @@
   - DELETE /api/v1/sessions - Revoke all sessions except current
   - _Requirements: 7.1, 7.2_
 
-- [-] 12.10 Implement device management routes
+- [x] 12.10 Implement device management routes
+
 
   - GET /api/v1/devices - List user devices
   - PUT /api/v1/devices/:id/trust - Mark device as trusted
   - DELETE /api/v1/devices/:id - Remove device
   - _Requirements: 15.2, 15.3, 15.4_
 
+
+
 - [ ] 12.11 Implement user management routes
   - GET /api/v1/users/profile - Get user profile
   - PUT /api/v1/users/profile - Update user profile
   - POST /api/v1/users/password/change - Change password
   - DELETE /api/v1/users/account - Delete user account
+
+
   - _Requirements: Various user management requirements_
 
 - [ ] 12.12 Implement admin routes
@@ -700,11 +705,13 @@
   - GET /api/v1/admin/audit-logs - Query audit logs
   - GET /api/v1/admin/roles - List all roles
   - POST /api/v1/admin/roles - Create new role
+
   - PUT /api/v1/admin/roles/:id - Update role
   - DELETE /api/v1/admin/roles/:id - Delete role (if not system role)
   - _Requirements: 11.1, 11.2, 13.5_
 
-- [ ] 12.13 Implement webhook routes
+- [x] 12.13 Implement webhook routes
+
   - POST /api/v1/webhooks - Create webhook
   - GET /api/v1/webhooks - List user webhooks
   - GET /api/v1/webhooks/:id - Get webhook details
@@ -712,6 +719,7 @@
   - DELETE /api/v1/webhooks/:id - Delete webhook
   - GET /api/v1/webhooks/:id/deliveries - List webhook deliveries
   - _Requirements: 16.1, 16.5, 16.6_
+
 
 - [ ] 12.14 Implement monitoring routes
   - GET /api/v1/health - Health check endpoint
