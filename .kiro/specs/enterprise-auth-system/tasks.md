@@ -1149,7 +1149,9 @@
   - Add volume mounts for persistence
   - _Requirements: All_
 
-- [-] 21.2 Create Kubernetes manifests
+- [x] 21.2 Create Kubernetes manifests
+
+
 
 
 
