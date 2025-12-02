@@ -1,7 +1,10 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { container } from '../../core/container/container.js';
 import { IWebhookService } from '../../application/services/webhook.service.js';
-import { authenticationMiddleware, AuthenticatedRequest } from '../middleware/authentication.middleware.js';
+import {
+  authenticationMiddleware,
+  AuthenticatedRequest,
+} from '../middleware/authentication.middleware.js';
 import {
   validateRequest,
   idParamSchema,

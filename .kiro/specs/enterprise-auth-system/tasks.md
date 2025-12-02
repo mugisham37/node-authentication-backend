@@ -583,7 +583,8 @@
 
 ## Phase 12: Presentation Layer - API Routes
 
-- [-] 12. Set up Fastify server and middleware
+- [x] 12. Set up Fastify server and middleware
+
 
 
 
@@ -644,7 +645,8 @@
 
 
 
-- [ ] 12.6 Implement MFA routes
+- [x] 12.6 Implement MFA routes
+
   - POST /api/v1/auth/mfa/setup - Enable MFA (TOTP or SMS)
   - POST /api/v1/auth/mfa/verify - Verify MFA code during login
   - POST /api/v1/auth/mfa/disable - Disable MFA
@@ -653,7 +655,9 @@
   - GET /api/v1/auth/mfa/backup-codes - Get backup codes
   - _Requirements: 4.1, 4.2, 4.3, 4.6, 5.1_
 
-- [ ] 12.7 Implement passwordless routes
+
+- [x] 12.7 Implement passwordless routes
+
   - POST /api/v1/auth/magic-link - Request magic link
 
 
@@ -663,7 +667,8 @@
   - _Requirements: 8.1, 8.2, 8.5, 8.6_
 
 
-- [ ] 12.8 Implement OAuth routes
+- [x] 12.8 Implement OAuth routes
+
   - GET /api/v1/oauth/:provider/authorize - Initiate OAuth flow
   - GET /api/v1/oauth/:provider/callback - Handle OAuth callback
   - GET /api/v1/oauth/accounts - List linked OAuth accounts
@@ -687,7 +692,8 @@
 
 
 
-- [ ] 12.11 Implement user management routes
+- [x] 12.11 Implement user management routes
+
   - GET /api/v1/users/profile - Get user profile
   - PUT /api/v1/users/profile - Update user profile
   - POST /api/v1/users/password/change - Change password
@@ -696,7 +702,8 @@
 
   - _Requirements: Various user management requirements_
 
-- [ ] 12.12 Implement admin routes
+- [x] 12.12 Implement admin routes
+
   - GET /api/v1/admin/users - List all users with pagination
   - GET /api/v1/admin/users/:id - Get user details
   - PUT /api/v1/admin/users/:id/roles - Assign roles to user
@@ -721,7 +728,8 @@
   - _Requirements: 16.1, 16.5, 16.6_
 
 
-- [ ] 12.14 Implement monitoring routes
+- [x] 12.14 Implement monitoring routes
+
   - GET /api/v1/health - Health check endpoint
   - GET /api/v1/metrics - Prometheus metrics endpoint
   - _Requirements: 22.4, 22.6_

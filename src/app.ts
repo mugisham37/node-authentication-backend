@@ -138,7 +138,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
         error: {
           type: 'ValidationError',
           message: 'Request validation failed',
-          details: (error as any).validation,
+          details: (error as unknown).validation,
           requestId,
         },
       });
@@ -165,7 +165,40 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     });
   });
 
-  // Health check endpoint
+  // Register routes
+  await registerRoutes(app);
+
+  return app;
+}
+
+/**
+ * Register all application routes
+ */
+async function registerRoutes(app: FastifyInstance): Promise<void> {
+  const { authRoutes } = await import('./presentation/routes/auth.routes.js');
+  const { mfaRoutes } = await import('./presentation/routes/mfa.routes.js');
+  const { passwordlessRoutes } = await import('./presentation/routes/passwordless.routes.js');
+  const { oauthRoutes } = await import('./presentation/routes/oauth.routes.js');
+  const { sessionRoutes } = await import('./presentation/routes/session.routes.js');
+  const { deviceRoutes } = await import('./presentation/routes/device.routes.js');
+  const { userRoutes } = await import('./presentation/routes/user.routes.js');
+  const { adminRoutes } = await import('./presentation/routes/admin.routes.js');
+  const { webhookRoutes } = await import('./presentation/routes/webhook.routes.js');
+  const { monitoringRoutes } = await import('./presentation/routes/monitoring.routes.js');
+
+  // Register all routes
+  await authRoutes(app);
+  await mfaRoutes(app);
+  await passwordlessRoutes(app);
+  await oauthRoutes(app);
+  await sessionRoutes(app);
+  await deviceRoutes(app);
+  await userRoutes(app);
+  await adminRoutes(app);
+  await webhookRoutes(app);
+  await monitoringRoutes(app);
+
+  // Root health check
   app.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
     return reply.status(200).send({
       status: 'ok',
@@ -173,8 +206,6 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
       uptime: process.uptime(),
     });
   });
-
-  return app;
 }
 
 export async function startServer(app: FastifyInstance): Promise<void> {
