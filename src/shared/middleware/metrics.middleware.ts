@@ -1,20 +1,17 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { httpRequestCounter, httpRequestDuration } from '../../core/monitoring/metrics.js';
+import { httpRequestCounter, httpRequestDuration } from '../monitoring/metrics.js';
 
 /**
  * Middleware to track HTTP request metrics
  * Requirements: 22.1 - Record request count, duration, and status code
  */
-export async function metricsMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
+export function metricsMiddleware(request: FastifyRequest, reply: FastifyReply): void {
   const startTime = Date.now();
 
   // Track request completion
-  reply.addHook('onSend', async () => {
+  reply.raw.on('finish', () => {
     const duration = (Date.now() - startTime) / 1000; // Convert to seconds
-    const route = request.routeOptions.url || request.url;
+    const route = request.routeOptions?.url || request.url;
     const method = request.method;
     const statusCode = reply.statusCode.toString();
 

@@ -18,72 +18,79 @@ export interface AuthenticatedRequest extends FastifyRequest {
 }
 
 /**
+ * Extract and validate Bearer token from Authorization header
+ */
+function extractBearerToken(authHeader: string | undefined): string {
+  if (!authHeader) {
+    throw new AuthenticationError('No authorization header provided');
+  }
+
+  if (!authHeader.startsWith('Bearer ')) {
+    throw new AuthenticationError('Invalid authorization header format. Expected: Bearer <token>');
+  }
+
+  const token = authHeader.substring(7);
+  if (!token) {
+    throw new AuthenticationError('No token provided');
+  }
+
+  return token;
+}
+
+/**
+ * Verify and decode JWT token with error handling
+ */
+function verifyToken(token: string): JwtPayload {
+  try {
+    return JwtService.verifyAccessToken(token);
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new AuthenticationError('Access token has expired');
+      }
+      if (error.name === 'JsonWebTokenError') {
+        throw new AuthenticationError('Invalid access token', {
+          reason: error.message,
+        });
+      }
+    }
+    throw new AuthenticationError('Token verification failed');
+  }
+}
+
+/**
+ * Attach user data to request and set logging context
+ */
+function attachUserToRequest(request: FastifyRequest, decoded: JwtPayload): void {
+  if (!decoded.userId) {
+    throw new AuthenticationError('Invalid token payload');
+  }
+
+  (request as AuthenticatedRequest).user = {
+    userId: decoded.userId,
+    email: decoded.email,
+    sessionId: decoded.sessionId,
+    roles: decoded.roles,
+    permissions: decoded.permissions,
+  };
+
+  userContextStorage.enterWith({
+    userId: decoded.userId,
+    email: decoded.email || 'unknown',
+  });
+}
+
+/**
  * Authentication middleware that verifies JWT access tokens
  * Uses centralized JwtService for token verification
  * Extracts token from Authorization header, validates it, and attaches user to request
  * Requirements: 3.7, 7.2, 19.1
  */
-export async function authenticationMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
+export function authenticationMiddleware(request: FastifyRequest, _reply: FastifyReply): void {
   try {
-    // Extract token from Authorization header
-    const authHeader = request.headers.authorization;
-
-    if (!authHeader) {
-      throw new AuthenticationError('No authorization header provided');
-    }
-
-    if (!authHeader.startsWith('Bearer ')) {
-      throw new AuthenticationError(
-        'Invalid authorization header format. Expected: Bearer <token>'
-      );
-    }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-
-    if (!token) {
-      throw new AuthenticationError('No token provided');
-    }
-
-    // Verify and decode token using centralized JwtService
-    let decoded: JwtPayload;
-    try {
-      decoded = JwtService.verifyAccessToken(token);
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.name === 'TokenExpiredError') {
-          throw new AuthenticationError('Access token has expired');
-        }
-        if (error.name === 'JsonWebTokenError') {
-          throw new AuthenticationError('Invalid access token', {
-            reason: error.message,
-          });
-        }
-      }
-      throw new AuthenticationError('Token verification failed');
-    }
-
-    // Validate token payload
-    if (!decoded.userId) {
-      throw new AuthenticationError('Invalid token payload');
-    }
-
-    // Attach user to request
-    (request as AuthenticatedRequest).user = {
-      userId: decoded.userId,
-      email: decoded.email,
-      sessionId: decoded.sessionId,
-      roles: decoded.roles,
-      permissions: decoded.permissions,
-    };
-
-    // Set user context for logging (Requirement 22.2)
-    userContextStorage.enterWith({
-      userId: decoded.userId,
-      email: decoded.email || 'unknown',
-    });
+    const token = extractBearerToken(request.headers.authorization);
+    const decoded = verifyToken(token);
+    attachUserToRequest(request, decoded);
   } catch (error) {
     if (error instanceof AuthenticationError) {
       throw error;
@@ -97,19 +104,18 @@ export async function authenticationMiddleware(
  * Uses centralized JwtService for token verification
  * Useful for endpoints that work with or without authentication
  */
-export async function optionalAuthenticationMiddleware(
+export function optionalAuthenticationMiddleware(
   request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
+  _reply: FastifyReply
+): void {
   try {
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return; // No token provided, continue without authentication
+      return;
     }
 
     const token = authHeader.substring(7);
-
     if (!token) {
       return;
     }
@@ -125,7 +131,6 @@ export async function optionalAuthenticationMiddleware(
         permissions: decoded.permissions,
       };
 
-      // Set user context for logging (Requirement 22.2)
       userContextStorage.enterWith({
         userId: decoded.userId,
         email: decoded.email || 'unknown',

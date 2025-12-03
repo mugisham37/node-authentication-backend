@@ -1,12 +1,31 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { z, ZodSchema, ZodError } from 'zod';
-import { ValidationError } from '../../core/errors/types/application-error.js';
+import { ValidationError } from '../errors/types/application-error.js';
 
 export interface ValidationSchemas {
   body?: ZodSchema;
   query?: ZodSchema;
   params?: ZodSchema;
   headers?: ZodSchema;
+}
+
+/**
+ * Validate a single request part with a Zod schema
+ */
+function validatePart<T>(
+  data: T,
+  schema: ZodSchema,
+  partName: string,
+  errors: Record<string, Array<{ path: string; message: string }>>
+): T {
+  try {
+    return schema.parse(data) as T;
+  } catch (error) {
+    if (error instanceof ZodError) {
+      errors[partName] = formatZodErrors(error);
+    }
+    return data;
+  }
 }
 
 /**
@@ -19,51 +38,22 @@ export function validateRequest(schemas: ValidationSchemas) {
     const errors: Record<string, Array<{ path: string; message: string }>> = {};
 
     try {
-      // Validate request body
       if (schemas.body) {
-        try {
-          request.body = schemas.body.parse(request.body);
-        } catch (error) {
-          if (error instanceof ZodError) {
-            errors['body'] = formatZodErrors(error);
-          }
-        }
+        request.body = validatePart(request.body, schemas.body, 'body', errors);
       }
 
-      // Validate query parameters
       if (schemas.query) {
-        try {
-          request.query = schemas.query.parse(request.query);
-        } catch (error) {
-          if (error instanceof ZodError) {
-            errors['query'] = formatZodErrors(error);
-          }
-        }
+        request.query = validatePart(request.query, schemas.query, 'query', errors);
       }
 
-      // Validate route parameters
       if (schemas.params) {
-        try {
-          request.params = schemas.params.parse(request.params);
-        } catch (error) {
-          if (error instanceof ZodError) {
-            errors['params'] = formatZodErrors(error);
-          }
-        }
+        request.params = validatePart(request.params, schemas.params, 'params', errors);
       }
 
-      // Validate headers
       if (schemas.headers) {
-        try {
-          request.headers = schemas.headers.parse(request.headers);
-        } catch (error) {
-          if (error instanceof ZodError) {
-            errors['headers'] = formatZodErrors(error);
-          }
-        }
+        request.headers = validatePart(request.headers, schemas.headers, 'headers', errors);
       }
 
-      // If there are any validation errors, throw
       if (Object.keys(errors).length > 0) {
         throw new ValidationError('Request validation failed', errors);
       }

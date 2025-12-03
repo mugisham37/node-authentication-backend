@@ -91,6 +91,66 @@ export class RateLimitService implements IRateLimitService {
     });
   }
 
+  /**
+   * Execute Redis sliding window rate limit check
+   */
+  private async executeRateLimitCheck(
+    key: string,
+    windowStart: number,
+    now: number,
+    windowMs: number
+  ): Promise<number> {
+    const multi = this.redis.multi();
+
+    multi.zremrangebyscore(key, 0, windowStart);
+    multi.zcard(key);
+    multi.zadd(key, now, `${now}`);
+    multi.expire(key, Math.ceil(windowMs / 1000));
+
+    const results = await multi.exec();
+
+    if (!results || results.length < 2 || !results[1]) {
+      throw new Error('Redis transaction failed');
+    }
+
+    return (results[1][1] as number) || 0;
+  }
+
+  /**
+   * Build rate limit result
+   */
+  private buildRateLimitResult(
+    count: number,
+    maxRequests: number,
+    now: number,
+    windowMs: number,
+    identifier: string,
+    endpoint: string,
+    trustScore: number
+  ): RateLimitResult {
+    const allowed = count < maxRequests;
+    const remaining = Math.max(0, maxRequests - count - 1);
+    const resetAt = new Date(now + windowMs);
+    const retryAfter = allowed ? undefined : Math.ceil(windowMs / 1000);
+
+    if (!allowed) {
+      logger.warn('Rate limit exceeded', {
+        identifier,
+        endpoint,
+        count,
+        maxRequests,
+        trustScore,
+      });
+    }
+
+    return {
+      allowed,
+      remaining,
+      resetAt,
+      retryAfter,
+    };
+  }
+
   async checkRateLimit(
     identifier: string,
     endpoint: string,
@@ -104,52 +164,22 @@ export class RateLimitService implements IRateLimitService {
     const windowStart = now - adjustedConfig.windowMs;
 
     try {
-      // Use Redis sorted set for sliding window
-      const multi = this.redis.multi();
+      const count = await this.executeRateLimitCheck(
+        key,
+        windowStart,
+        now,
+        adjustedConfig.windowMs
+      );
 
-      // Remove old entries outside the window
-      multi.zremrangebyscore(key, 0, windowStart);
-
-      // Count requests in current window
-      multi.zcard(key);
-
-      // Add current request
-      multi.zadd(key, now, `${now}`);
-
-      // Set expiry on the key
-      multi.expire(key, Math.ceil(adjustedConfig.windowMs / 1000));
-
-      const results = await multi.exec();
-
-      if (!results) {
-        throw new Error('Redis transaction failed');
-      }
-
-      // Get count from zcard result (index 1)
-      const count = (results[1][1] as number) || 0;
-
-      const allowed = count < adjustedConfig.maxRequests;
-      const remaining = Math.max(0, adjustedConfig.maxRequests - count - 1);
-
-      const resetAt = new Date(now + adjustedConfig.windowMs);
-      const retryAfter = allowed ? undefined : Math.ceil(adjustedConfig.windowMs / 1000);
-
-      if (!allowed) {
-        logger.warn('Rate limit exceeded', {
-          identifier,
-          endpoint,
-          count,
-          maxRequests: adjustedConfig.maxRequests,
-          trustScore,
-        });
-      }
-
-      return {
-        allowed,
-        remaining,
-        resetAt,
-        retryAfter,
-      };
+      return this.buildRateLimitResult(
+        count,
+        adjustedConfig.maxRequests,
+        now,
+        adjustedConfig.windowMs,
+        identifier,
+        endpoint,
+        trustScore
+      );
     } catch (error) {
       logger.error('Rate limit check failed', {
         error,
@@ -157,7 +187,6 @@ export class RateLimitService implements IRateLimitService {
         endpoint,
       });
 
-      // Fail open - allow request if Redis is unavailable
       return {
         allowed: true,
         remaining: adjustedConfig.maxRequests,
@@ -167,7 +196,11 @@ export class RateLimitService implements IRateLimitService {
   }
 
   getEndpointConfig(endpoint: string): RateLimitConfig {
-    return this.endpointConfigs.get(endpoint) || this.endpointConfigs.get('default')!;
+    const config = this.endpointConfigs.get(endpoint) || this.endpointConfigs.get('default');
+    if (!config) {
+      throw new Error('Default rate limit configuration not found');
+    }
+    return config;
   }
 
   async resetRateLimit(identifier: string, endpoint: string): Promise<void> {

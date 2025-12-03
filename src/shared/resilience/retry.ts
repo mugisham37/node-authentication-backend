@@ -133,14 +133,15 @@ function isRetryableError(error: Error, config: RetryConfig): boolean {
   }
 
   const errorMessage = error.message.toUpperCase();
-  const errorCode = (error as any).code?.toUpperCase();
+  const errorWithCode = error as { code?: string; statusCode?: number };
+  const errorCode = errorWithCode.code?.toUpperCase();
 
   return config.retryableErrors.some((retryableError) => {
     const upperRetryable = retryableError.toUpperCase();
     return (
       errorMessage.includes(upperRetryable) ||
       errorCode === upperRetryable ||
-      (error as any).statusCode === parseInt(retryableError, 10)
+      errorWithCode.statusCode === parseInt(retryableError, 10)
     );
   });
 }
@@ -151,6 +152,84 @@ function isRetryableError(error: Error, config: RetryConfig): boolean {
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute a function with retry logic and exponential backoff
+ * Requirement: 20.2 - Implement retry with exponential backoff
+/**
+ * Extract error details safely
+ */
+function getErrorDetails(error: Error): { name: string; message: string; code?: string } {
+  const errorWithCode = error as Error & { code?: string };
+  return {
+    name: error.name,
+    message: error.message,
+    code: errorWithCode.code,
+  };
+}
+
+/**
+ * Log retry failure
+ */
+function logRetryFailure(
+  context: string,
+  attempt: number,
+  totalAttempts: number,
+  duration: number,
+  error: Error,
+  retryable: boolean
+): void {
+  logger.error('Operation failed after retries', {
+    context,
+    attempt,
+    totalAttempts,
+    duration,
+    error: getErrorDetails(error),
+    retryable,
+  });
+}
+
+/**
+ * Log retry attempt
+ */
+function logRetryAttempt(
+  context: string,
+  attempt: number,
+  totalAttempts: number,
+  delay: number,
+  error: Error
+): void {
+  logger.warn('Operation failed, retrying', {
+    context,
+    attempt,
+    totalAttempts,
+    nextRetryIn: delay,
+    error: getErrorDetails(error),
+  });
+}
+
+/**
+ * Execute retry callback safely
+ */
+function executeRetryCallback(
+  callback: ((error: Error, attempt: number) => void) | undefined,
+  error: Error,
+  attempt: number,
+  context: string
+): void {
+  if (!callback) {
+    return;
+  }
+
+  try {
+    callback(error, attempt);
+  } catch (callbackError) {
+    logger.error('Error in retry callback', {
+      context,
+      error: callbackError,
+    });
+  }
 }
 
 /**
@@ -187,61 +266,28 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error as Error;
 
-      // Check if this is the last attempt
       const isLastAttempt = attempt === config.maxAttempts - 1;
-
-      // Check if error is retryable
       const shouldRetry = isRetryableError(lastError, config);
 
       if (isLastAttempt || !shouldRetry) {
-        logger.error('Operation failed after retries', {
+        logRetryFailure(
           context,
-          attempt: attempt + 1,
-          totalAttempts: config.maxAttempts,
-          duration: Date.now() - startTime,
-          error: {
-            name: lastError.name,
-            message: lastError.message,
-            code: (lastError as any).code,
-          },
-          retryable: shouldRetry,
-        });
+          attempt + 1,
+          config.maxAttempts,
+          Date.now() - startTime,
+          lastError,
+          shouldRetry
+        );
         throw lastError;
       }
 
-      // Calculate delay for next retry
       const delay = calculateDelay(attempt, config);
-
-      logger.warn('Operation failed, retrying', {
-        context,
-        attempt: attempt + 1,
-        totalAttempts: config.maxAttempts,
-        nextRetryIn: delay,
-        error: {
-          name: lastError.name,
-          message: lastError.message,
-          code: (lastError as any).code,
-        },
-      });
-
-      // Call onRetry callback if provided
-      if (config.onRetry) {
-        try {
-          config.onRetry(lastError, attempt + 1);
-        } catch (callbackError) {
-          logger.error('Error in retry callback', {
-            context,
-            error: callbackError,
-          });
-        }
-      }
-
-      // Wait before next retry
+      logRetryAttempt(context, attempt + 1, config.maxAttempts, delay, lastError);
+      executeRetryCallback(config.onRetry, lastError, attempt + 1, context);
       await sleep(delay);
     }
   }
 
-  // This should never be reached, but TypeScript needs it
   throw lastError || new Error('Retry failed with unknown error');
 }
 
@@ -293,12 +339,15 @@ export async function withRetryDetailed<T>(
  * @param context Context name for logging
  * @returns Wrapped function with retry logic
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createRetryWrapper<T extends (...args: any[]) => Promise<any>>(
   fn: T,
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
   context: string = 'operation'
 ): T {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (async (...args: any[]) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return withRetry(() => fn(...args), config, context);
   }) as T;
 }
@@ -315,14 +364,19 @@ export function retry(
   context?: string
 ): MethodDecorator {
   return function (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     target: any,
     propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ): PropertyDescriptor {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const originalMethod = descriptor.value;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     const methodContext = context || `${target.constructor.name}.${String(propertyKey)}`;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     descriptor.value = async function (...args: any[]) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       return withRetry(() => originalMethod.apply(this, args), config, methodContext);
     };
 

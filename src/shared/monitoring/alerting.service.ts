@@ -72,7 +72,7 @@ export class AlertingService {
    * Send an alert
    * Requirements: 18.4
    */
-  async sendAlert(alert: Alert): Promise<void> {
+  sendAlert(alert: Alert): void {
     // Check if we should send this alert (cooldown period)
     const alertKey = `${alert.type}-${alert.severity}`;
     const lastAlertTime = this.alertHistory.get(alertKey);
@@ -99,7 +99,7 @@ export class AlertingService {
     // Track security events metric
     if (alert.type === AlertType.SECURITY_EVENT) {
       securityEvents.inc({
-        event_type: (alert.metadata?.eventType as string) || 'unknown',
+        event_type: (alert.metadata?.['eventType'] as string) || 'unknown',
         severity: alert.severity,
       });
     }
@@ -112,18 +112,18 @@ export class AlertingService {
     // - Datadog/New Relic alerting
 
     // For now, we just log the alert
-    await this.notifyAlertChannels(alert);
+    this.notifyAlertChannels(alert);
   }
 
   /**
    * Alert on high error rate
    * Requirements: 18.4
    */
-  async alertHighErrorRate(errorCount: number, timeWindowMinutes: number): Promise<void> {
+  alertHighErrorRate(errorCount: number, timeWindowMinutes: number): void {
     const errorRate = errorCount / timeWindowMinutes;
 
     if (errorRate > this.thresholds.errorRatePerMinute) {
-      await this.sendAlert({
+      this.sendAlert({
         type: AlertType.HIGH_ERROR_RATE,
         severity: AlertSeverity.ERROR,
         message: `High error rate detected: ${errorRate.toFixed(2)} errors/minute`,
@@ -142,9 +142,9 @@ export class AlertingService {
    * Alert on high latency
    * Requirements: 18.4
    */
-  async alertHighLatency(p95LatencyMs: number, endpoint: string): Promise<void> {
+  alertHighLatency(p95LatencyMs: number, endpoint: string): void {
     if (p95LatencyMs > this.thresholds.latencyP95Ms) {
-      await this.sendAlert({
+      this.sendAlert({
         type: AlertType.HIGH_LATENCY,
         severity: AlertSeverity.WARNING,
         message: `High latency detected on ${endpoint}: ${p95LatencyMs}ms (p95)`,
@@ -162,13 +162,13 @@ export class AlertingService {
    * Alert on security events
    * Requirements: 18.4
    */
-  async alertSecurityEvent(
+  alertSecurityEvent(
     eventType: string,
     severity: AlertSeverity,
     message: string,
     metadata?: Record<string, unknown>
-  ): Promise<void> {
-    await this.sendAlert({
+  ): void {
+    this.sendAlert({
       type: AlertType.SECURITY_EVENT,
       severity,
       message: `Security event: ${message}`,
@@ -184,15 +184,15 @@ export class AlertingService {
    * Alert on system health issues
    * Requirements: 18.4
    */
-  async alertSystemHealth(
+  alertSystemHealth(
     component: string,
     status: 'degraded' | 'down',
     message: string,
     metadata?: Record<string, unknown>
-  ): Promise<void> {
+  ): void {
     const severity = status === 'down' ? AlertSeverity.CRITICAL : AlertSeverity.WARNING;
 
-    await this.sendAlert({
+    this.sendAlert({
       type: AlertType.SYSTEM_HEALTH,
       severity,
       message: `System health issue in ${component}: ${message}`,
@@ -209,15 +209,15 @@ export class AlertingService {
    * Alert on multiple failed login attempts
    * Requirements: 18.4
    */
-  async alertFailedLoginAttempts(
+  alertFailedLoginAttempts(
     failedAttempts: number,
     timeWindowMinutes: number,
     ipAddress?: string
-  ): Promise<void> {
+  ): void {
     const attemptRate = failedAttempts / timeWindowMinutes;
 
     if (attemptRate > this.thresholds.failedLoginsPerMinute) {
-      await this.sendAlert({
+      this.sendAlert({
         type: AlertType.FAILED_LOGIN_ATTEMPTS,
         severity: AlertSeverity.WARNING,
         message: `High rate of failed login attempts: ${attemptRate.toFixed(2)} attempts/minute`,
@@ -237,8 +237,8 @@ export class AlertingService {
    * Alert on account lockouts
    * Requirements: 18.4
    */
-  async alertAccountLockout(userId: string, email: string, reason: string): Promise<void> {
-    await this.sendAlert({
+  alertAccountLockout(userId: string, email: string, reason: string): void {
+    this.sendAlert({
       type: AlertType.ACCOUNT_LOCKOUT,
       severity: AlertSeverity.WARNING,
       message: `Account locked: ${email}`,
@@ -254,7 +254,7 @@ export class AlertingService {
   /**
    * Notify alert channels (placeholder for actual integrations)
    */
-  private async notifyAlertChannels(alert: Alert): Promise<void> {
+  private notifyAlertChannels(alert: Alert): void {
     // In production, implement actual notification channels:
     // - PagerDuty API for critical alerts
     // - Slack webhook for warnings

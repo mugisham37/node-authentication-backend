@@ -1,7 +1,18 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { container } from '../container/container.js';
-import { IAuditLogService } from '../../application/services/audit-log.service.js';
+import { IAuditLogService } from '../application/services/audit-log.service.js';
 import { log } from '../logging/logger.js';
+
+/**
+ * Extended FastifyRequest with optional user property
+ */
+interface AuthenticatedRequest extends FastifyRequest {
+  user?: {
+    id: string;
+    email?: string;
+    [key: string]: unknown;
+  };
+}
 
 /**
  * Audit logging middleware for security events
@@ -18,7 +29,8 @@ import { log } from '../logging/logger.js';
  * Extract user ID from request
  */
 function getUserId(request: FastifyRequest): string | undefined {
-  return (request as any).user?.id;
+  const authenticatedRequest = request as AuthenticatedRequest;
+  return authenticatedRequest.user?.id;
 }
 
 /**
@@ -29,13 +41,21 @@ function getIpAddress(request: FastifyRequest): string {
   const forwarded = request.headers['x-forwarded-for'];
   if (forwarded) {
     const ips = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-    return ips.split(',')[0].trim();
+    if (ips !== undefined && ips !== '' && typeof ips === 'string') {
+      const firstIp = ips.split(',')[0];
+      if (firstIp) {
+        return firstIp.trim();
+      }
+    }
   }
 
   // Check for real IP
   const realIp = request.headers['x-real-ip'];
   if (realIp) {
-    return Array.isArray(realIp) ? realIp[0] : realIp;
+    const realIpValue = Array.isArray(realIp) ? realIp[0] : realIp;
+    if (realIpValue) {
+      return realIpValue;
+    }
   }
 
   // Fall back to request IP
@@ -47,13 +67,16 @@ function getIpAddress(request: FastifyRequest): string {
  */
 function getUserAgent(request: FastifyRequest): string | undefined {
   const userAgent = request.headers['user-agent'];
-  return Array.isArray(userAgent) ? userAgent[0] : userAgent;
+  if (Array.isArray(userAgent)) {
+    return userAgent[0] as string | undefined;
+  }
+  return userAgent;
 }
 
 /**
  * Determine if route is security-relevant
  */
-function isSecurityRelevantRoute(url: string, method: string): boolean {
+function isSecurityRelevantRoute(url: string, _method: string): boolean {
   const securityRoutes = [
     // Authentication routes
     '/api/v1/auth/register',
@@ -90,49 +113,55 @@ function isSecurityRelevantRoute(url: string, method: string): boolean {
 }
 
 /**
+ * Action name mapping for routes
+ */
+const ACTION_MAPPINGS: Array<{ pattern: string; method?: string; action: string }> = [
+  // Authentication actions
+  { pattern: '/auth/register', action: 'user.register' },
+  { pattern: '/auth/login', action: 'user.login' },
+  { pattern: '/auth/logout', action: 'user.logout' },
+  { pattern: '/auth/refresh', action: 'token.refresh' },
+  { pattern: '/auth/verify-email', action: 'email.verify' },
+  { pattern: '/auth/password/forgot', action: 'password.reset.request' },
+  { pattern: '/auth/password/reset', action: 'password.reset.complete' },
+  { pattern: '/auth/password/change', action: 'password.change' },
+  // MFA actions
+  { pattern: '/mfa/setup', action: 'mfa.enable' },
+  { pattern: '/mfa/verify', action: 'mfa.verify' },
+  { pattern: '/mfa/disable', action: 'mfa.disable' },
+  // OAuth actions
+  { pattern: '/oauth/authorize', action: 'oauth.authorize' },
+  { pattern: '/oauth/callback', action: 'oauth.callback' },
+  // Session actions
+  { pattern: '/sessions', method: 'GET', action: 'session.list' },
+  { pattern: '/sessions', method: 'DELETE', action: 'session.revoke' },
+  // Device actions
+  { pattern: '/devices', method: 'GET', action: 'device.list' },
+  { pattern: '/devices', method: 'PUT', action: 'device.trust' },
+  { pattern: '/devices', method: 'DELETE', action: 'device.remove' },
+  // Admin actions
+  { pattern: '/admin/users/roles', action: 'admin.users.assign_role' },
+  { pattern: '/admin/users/lock', action: 'admin.users.lock' },
+  { pattern: '/admin/users/unlock', action: 'admin.users.unlock' },
+  { pattern: '/admin/users', method: 'GET', action: 'admin.users.list' },
+  { pattern: '/admin/roles', method: 'POST', action: 'admin.roles.create' },
+  { pattern: '/admin/roles', method: 'PUT', action: 'admin.roles.update' },
+  { pattern: '/admin/roles', method: 'DELETE', action: 'admin.roles.delete' },
+  // Account deletion
+  { pattern: '/users/account', method: 'DELETE', action: 'user.account.delete' },
+];
+
+/**
  * Determine action name from route and method
  */
 function getActionName(url: string, method: string): string {
-  // Authentication actions
-  if (url.includes('/auth/register')) return 'user.register';
-  if (url.includes('/auth/login')) return 'user.login';
-  if (url.includes('/auth/logout')) return 'user.logout';
-  if (url.includes('/auth/refresh')) return 'token.refresh';
-  if (url.includes('/auth/verify-email')) return 'email.verify';
-  if (url.includes('/auth/password/forgot')) return 'password.reset.request';
-  if (url.includes('/auth/password/reset')) return 'password.reset.complete';
-  if (url.includes('/auth/password/change')) return 'password.change';
-
-  // MFA actions
-  if (url.includes('/mfa/setup')) return 'mfa.enable';
-  if (url.includes('/mfa/verify')) return 'mfa.verify';
-  if (url.includes('/mfa/disable')) return 'mfa.disable';
-
-  // OAuth actions
-  if (url.includes('/oauth') && url.includes('/authorize')) return 'oauth.authorize';
-  if (url.includes('/oauth') && url.includes('/callback')) return 'oauth.callback';
-
-  // Session actions
-  if (url.includes('/sessions') && method === 'GET') return 'session.list';
-  if (url.includes('/sessions') && method === 'DELETE') return 'session.revoke';
-
-  // Device actions
-  if (url.includes('/devices') && method === 'GET') return 'device.list';
-  if (url.includes('/devices') && method === 'PUT') return 'device.trust';
-  if (url.includes('/devices') && method === 'DELETE') return 'device.remove';
-
-  // Admin actions
-  if (url.includes('/admin/users') && method === 'GET') return 'admin.users.list';
-  if (url.includes('/admin/users') && url.includes('/roles')) return 'admin.users.assign_role';
-  if (url.includes('/admin/users') && url.includes('/lock')) return 'admin.users.lock';
-  if (url.includes('/admin/users') && url.includes('/unlock')) return 'admin.users.unlock';
-  if (url.includes('/admin/roles') && method === 'POST') return 'admin.roles.create';
-  if (url.includes('/admin/roles') && method === 'PUT') return 'admin.roles.update';
-  if (url.includes('/admin/roles') && method === 'DELETE') return 'admin.roles.delete';
-
-  // Account deletion
-  if (url.includes('/users/account') && method === 'DELETE') return 'user.account.delete';
-
+  for (const mapping of ACTION_MAPPINGS) {
+    if (url.includes(mapping.pattern)) {
+      if (!mapping.method || mapping.method === method) {
+        return mapping.action;
+      }
+    }
+  }
   // Generic action
   return `${method.toLowerCase()}.${url.replace(/^\/api\/v\d+\//, '').replace(/\//g, '.')}`;
 }
@@ -146,10 +175,14 @@ function getResourceInfo(url: string): { resource?: string; resourceId?: string 
   // Try to find resource and ID pattern
   for (let i = 0; i < parts.length - 1; i++) {
     // Check if next part looks like a UUID
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parts[i + 1])) {
+    const nextPart = parts[i + 1];
+    if (
+      nextPart &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nextPart)
+    ) {
       return {
         resource: parts[i],
-        resourceId: parts[i + 1],
+        resourceId: nextPart,
       };
     }
   }
@@ -163,71 +196,82 @@ function getResourceInfo(url: string): { resource?: string; resourceId?: string 
  * Audit logging middleware
  * Logs all security-relevant requests
  */
-export async function auditLoggingMiddleware(
-  request: FastifyRequest,
-  reply: FastifyReply
+/**
+ * Create audit log entry asynchronously
+ */
+async function createAuditLogEntry(
+  auditLogService: IAuditLogService,
+  logData: {
+    userId?: string;
+    action: string;
+    resource?: string;
+    resourceId?: string;
+    status: 'success' | 'failure';
+    ipAddress: string;
+    userAgent?: string;
+    metadata: Record<string, unknown>;
+  }
 ): Promise<void> {
+  try {
+    await auditLogService.createAuditLog(logData);
+    log.debug('Security event logged', {
+      action: logData.action,
+      userId: logData.userId,
+      status: logData.status,
+      statusCode: logData.metadata['statusCode'],
+    });
+  } catch (error) {
+    log.error('Failed to create audit log', error as Error, {
+      action: logData.action,
+      userId: logData.userId,
+      url: logData.metadata['url'],
+    });
+  }
+}
+
+/**
+ * Audit logging middleware
+ * Logs all security-relevant requests
+ */
+export function auditLoggingMiddleware(request: FastifyRequest, reply: FastifyReply): void {
   const url = request.url;
   const method = request.method;
 
-  // Only log security-relevant routes
   if (!isSecurityRelevantRoute(url, method)) {
     return;
   }
 
-  // Get audit log service
   const auditLogService = container.resolve<IAuditLogService>('auditLogService');
-
-  // Extract request information
   const userId = getUserId(request);
   const ipAddress = getIpAddress(request);
   const userAgent = getUserAgent(request);
   const action = getActionName(url, method);
   const { resource, resourceId } = getResourceInfo(url);
 
-  // Hook into response to log after completion
-  reply.addHook('onSend', async (request, reply, payload) => {
-    try {
-      const statusCode = reply.statusCode;
-      const status = statusCode >= 200 && statusCode < 300 ? 'success' : 'failure';
+  reply.raw.on('finish', () => {
+    const statusCode = reply.statusCode;
+    const status = statusCode >= 200 && statusCode < 300 ? 'success' : 'failure';
 
-      // Create audit log
-      await auditLogService.createAuditLog({
-        userId,
-        action,
-        resource,
-        resourceId,
-        status,
-        ipAddress,
-        userAgent,
-        metadata: {
-          method,
-          url,
-          statusCode,
-          requestId: request.id,
-          // Include request body for failed authentication attempts (for security analysis)
-          ...(status === 'failure' && request.body
-            ? { requestBody: sanitizeRequestBody(request.body) }
-            : {}),
-        },
-      });
+    const metadata = {
+      method,
+      url,
+      statusCode,
+      requestId: request.id,
+      ...(status === 'failure' && request.body
+        ? { requestBody: sanitizeRequestBody(request.body as Record<string, unknown>) }
+        : {}),
+    };
 
-      log.debug('Security event logged', {
-        action,
-        userId,
-        status,
-        statusCode,
-      });
-    } catch (error) {
-      // Don't throw - audit logging should not break the request
-      log.error('Failed to create audit log', error as Error, {
-        action,
-        userId,
-        url,
-      });
-    }
-
-    return payload;
+    void createAuditLogEntry(auditLogService, {
+      userId,
+      action,
+      resource,
+      resourceId,
+      status,
+      ipAddress,
+      userAgent,
+      metadata,
+    });
   });
 }
 
@@ -235,9 +279,9 @@ export async function auditLoggingMiddleware(
  * Sanitize request body for audit logging
  * Remove sensitive fields like passwords
  */
-function sanitizeRequestBody(body: any): any {
+function sanitizeRequestBody(body: Record<string, unknown>): Record<string, unknown> {
   if (!body || typeof body !== 'object') {
-    return body;
+    return {};
   }
 
   const sanitized = { ...body };

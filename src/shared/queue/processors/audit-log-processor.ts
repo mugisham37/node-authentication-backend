@@ -30,6 +30,46 @@ export class AuditLogProcessor {
   constructor(private readonly auditLogRepository: IAuditLogRepository) {}
 
   /**
+   * Parse IP address from string with error handling
+   */
+  private parseIpAddress(ipAddressString?: string): IPAddress | null {
+    if (!ipAddressString) {
+      return null;
+    }
+
+    try {
+      return new IPAddress(ipAddressString);
+    } catch (error) {
+      logger.warn('Invalid IP address in audit log', {
+        ipAddress: ipAddressString,
+        error: (error as Error).message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Create audit log entity from job data
+   */
+  private createAuditLogEntity(input: AuditLogJobData, ipAddress: IPAddress | null): AuditLog {
+    const riskScore = AuditLog.calculateRiskScore(input.action, input.status, input.metadata);
+
+    return new AuditLog({
+      id: randomUUID(),
+      userId: input.userId,
+      action: input.action,
+      resource: input.resource,
+      resourceId: input.resourceId,
+      status: input.status,
+      ipAddress,
+      userAgent: input.userAgent,
+      metadata: input.metadata || {},
+      riskScore,
+      createdAt: new Date(),
+    });
+  }
+
+  /**
    * Process audit log creation job
    * Requirements: 13.1, 13.2, 13.3, 13.4, 13.6
    */
@@ -44,38 +84,9 @@ export class AuditLogProcessor {
     });
 
     try {
-      // Parse IP address if provided
-      let ipAddress: IPAddress | null = null;
-      if (input.ipAddress) {
-        try {
-          ipAddress = new IPAddress(input.ipAddress);
-        } catch (error) {
-          logger.warn('Invalid IP address in audit log', {
-            ipAddress: input.ipAddress,
-            error: (error as Error).message,
-          });
-        }
-      }
+      const ipAddress = this.parseIpAddress(input.ipAddress);
+      const auditLog = this.createAuditLogEntity(input, ipAddress);
 
-      // Calculate risk score (Requirement: 13.3)
-      const riskScore = AuditLog.calculateRiskScore(input.action, input.status, input.metadata);
-
-      // Create audit log entity
-      const auditLog = new AuditLog({
-        id: randomUUID(),
-        userId: input.userId,
-        action: input.action,
-        resource: input.resource,
-        resourceId: input.resourceId,
-        status: input.status,
-        ipAddress,
-        userAgent: input.userAgent,
-        metadata: input.metadata || {},
-        riskScore,
-        createdAt: new Date(),
-      });
-
-      // Save to database (Requirement: 13.1, 13.6)
       await this.auditLogRepository.create(auditLog);
 
       logger.info('Audit log created', {
@@ -87,7 +98,6 @@ export class AuditLogProcessor {
         riskLevel: auditLog.getRiskLevel(),
       });
 
-      // Generate security alert for high-risk events (Requirement: 13.4)
       if (auditLog.isHighRisk()) {
         this.generateSecurityAlert(auditLog);
       }
@@ -98,7 +108,7 @@ export class AuditLogProcessor {
         userId: input.userId,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw error; // Re-throw to trigger retry
+      throw error;
     }
   }
 
@@ -108,6 +118,9 @@ export class AuditLogProcessor {
    */
   private generateSecurityAlert(auditLog: AuditLog): void {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const ipAddress: IPAddress | null = auditLog.ipAddress;
+
       const alert: SecurityAlert = {
         auditLogId: auditLog.id,
         userId: auditLog.userId,
@@ -119,7 +132,7 @@ export class AuditLogProcessor {
           resource: auditLog.resource,
           resourceId: auditLog.resourceId,
           status: auditLog.status,
-          ipAddress: auditLog.ipAddress?.toString(),
+          ipAddress: ipAddress?.toString(),
           userAgent: auditLog.userAgent,
           ...auditLog.metadata,
         },

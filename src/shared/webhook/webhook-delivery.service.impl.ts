@@ -42,6 +42,125 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
     }
   }
 
+  /**
+   * Prepare webhook request headers
+   */
+  private prepareWebhookHeaders(
+    signature: string,
+    timestamp: number,
+    eventType: string,
+    attemptCount: number
+  ): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'X-Webhook-Signature': signature,
+      'X-Webhook-Timestamp': timestamp.toString(),
+      'X-Webhook-Event': eventType,
+      'X-Webhook-Delivery-Attempt': attemptCount.toString(),
+      'User-Agent': 'Enterprise-Auth-Webhook/1.0',
+    };
+  }
+
+  /**
+   * Send HTTP webhook request with timeout
+   */
+  private async sendWebhookHttpRequest(
+    url: string,
+    headers: Record<string, string>,
+    body: string
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle successful webhook response
+   */
+  private handleSuccessResponse(
+    event: WebhookEvent,
+    response: Response,
+    responseBody: string,
+    attemptCount: number
+  ): WebhookDeliveryResult {
+    logger.info('Webhook delivered successfully', {
+      webhookId: event.webhookId,
+      eventType: event.type,
+      statusCode: response.status,
+      attemptCount,
+    });
+
+    return {
+      success: true,
+      statusCode: response.status,
+      responseBody,
+      attemptCount,
+    };
+  }
+
+  /**
+   * Handle failed webhook response
+   */
+  private handleErrorResponse(
+    event: WebhookEvent,
+    response: Response,
+    responseBody: string,
+    attemptCount: number
+  ): WebhookDeliveryResult {
+    logger.warn('Webhook delivery failed with non-2xx status', {
+      webhookId: event.webhookId,
+      eventType: event.type,
+      statusCode: response.status,
+      responseBody,
+      attemptCount,
+    });
+
+    return {
+      success: false,
+      statusCode: response.status,
+      responseBody,
+      error: `HTTP ${response.status}: ${response.statusText}`,
+      attemptCount,
+    };
+  }
+
+  /**
+   * Handle webhook exception
+   */
+  private handleException(
+    event: WebhookEvent,
+    error: unknown,
+    attemptCount: number
+  ): WebhookDeliveryResult {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    logger.error('Webhook delivery failed', {
+      error,
+      webhookId: event.webhookId,
+      eventType: event.type,
+      attemptCount,
+    });
+
+    return {
+      success: false,
+      error: errorMessage,
+      attemptCount,
+    };
+  }
+
   async deliverWebhook(event: WebhookEvent, attemptCount: number): Promise<WebhookDeliveryResult> {
     const timestamp = Math.floor(Date.now() / 1000);
     const { signature } = HmacService.generateWebhookSignature(
@@ -51,73 +170,21 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
     );
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-      const response = await fetch(event.webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Signature': signature,
-          'X-Webhook-Timestamp': timestamp.toString(),
-          'X-Webhook-Event': event.type,
-          'X-Webhook-Delivery-Attempt': attemptCount.toString(),
-          'User-Agent': 'Enterprise-Auth-Webhook/1.0',
-        },
-        body: JSON.stringify(event.payload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
+      const headers = this.prepareWebhookHeaders(signature, timestamp, event.type, attemptCount);
+      const response = await this.sendWebhookHttpRequest(
+        event.webhookUrl,
+        headers,
+        JSON.stringify(event.payload)
+      );
       const responseBody = await response.text();
 
       if (response.ok) {
-        logger.info('Webhook delivered successfully', {
-          webhookId: event.webhookId,
-          eventType: event.type,
-          statusCode: response.status,
-          attemptCount,
-        });
-
-        return {
-          success: true,
-          statusCode: response.status,
-          responseBody,
-          attemptCount,
-        };
+        return this.handleSuccessResponse(event, response, responseBody, attemptCount);
       } else {
-        logger.warn('Webhook delivery failed with non-2xx status', {
-          webhookId: event.webhookId,
-          eventType: event.type,
-          statusCode: response.status,
-          responseBody,
-          attemptCount,
-        });
-
-        return {
-          success: false,
-          statusCode: response.status,
-          responseBody,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-          attemptCount,
-        };
+        return this.handleErrorResponse(event, response, responseBody, attemptCount);
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      logger.error('Webhook delivery failed', {
-        error,
-        webhookId: event.webhookId,
-        eventType: event.type,
-        attemptCount,
-      });
-
-      return {
-        success: false,
-        error: errorMessage,
-        attemptCount,
-      };
+      return this.handleException(event, error, attemptCount);
     }
   }
 

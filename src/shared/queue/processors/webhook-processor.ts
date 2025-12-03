@@ -19,6 +19,41 @@ export interface WebhookDeliveryResult {
 
 export class WebhookProcessor {
   /**
+   * Prepare webhook request headers
+   */
+  private prepareHeaders(
+    signature: string,
+    eventType: string,
+    timestamp: string,
+    webhookId: string
+  ): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'X-Webhook-Signature': signature,
+      'X-Webhook-Event': eventType,
+      'X-Webhook-Timestamp': timestamp,
+      'X-Webhook-ID': webhookId,
+      'User-Agent': 'Enterprise-Auth-System/1.0',
+    };
+  }
+
+  /**
+   * Send webhook HTTP request
+   */
+  private async sendWebhookRequest(
+    webhookUrl: string,
+    headers: Record<string, string>,
+    body: string
+  ): Promise<Response> {
+    return fetch(webhookUrl, {
+      method: 'POST',
+      headers,
+      body,
+      signal: AbortSignal.timeout(30000),
+    });
+  }
+
+  /**
    * Process webhook delivery job
    * Requirements: 16.2, 16.3, 16.4
    */
@@ -35,28 +70,12 @@ export class WebhookProcessor {
     });
 
     try {
-      // Generate HMAC signature (Requirement: 16.4)
       const signature = this.generateSignature(payload, webhookSecret);
-
-      // Prepare request
       const requestBody = JSON.stringify(payload);
       const timestamp = new Date().toISOString();
+      const headers = this.prepareHeaders(signature, eventType, timestamp, webhookId);
 
-      // Send HTTP POST request (Requirement: 16.2)
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Webhook-Signature': signature,
-          'X-Webhook-Event': eventType,
-          'X-Webhook-Timestamp': timestamp,
-          'X-Webhook-ID': webhookId,
-          'User-Agent': 'Enterprise-Auth-System/1.0',
-        },
-        body: requestBody,
-        signal: AbortSignal.timeout(30000), // 30 second timeout
-      });
-
+      const response = await this.sendWebhookRequest(webhookUrl, headers, requestBody);
       const responseBody = await response.text();
 
       if (response.ok) {
@@ -69,7 +88,7 @@ export class WebhookProcessor {
         return {
           success: true,
           statusCode: response.status,
-          responseBody: responseBody.substring(0, 1000), // Limit response body size
+          responseBody: responseBody.substring(0, 1000),
           deliveredAt: new Date(),
         };
       } else {
@@ -92,7 +111,6 @@ export class WebhookProcessor {
         attempt: job.attemptsMade + 1,
       });
 
-      // Re-throw to trigger retry (Requirement: 16.3)
       throw error;
     }
   }

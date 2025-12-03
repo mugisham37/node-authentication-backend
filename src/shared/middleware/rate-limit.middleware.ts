@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { env } from '../config/env.js';
-import { RateLimitError } from '../../core/errors/types/application-error.js';
+import { RateLimitError } from '../errors/types/application-error.js';
 import { container } from '../container/container.js';
 import { IRateLimitService } from '../application/services/rate-limit.service.js';
 import { AuthenticatedRequest } from './authentication.middleware.js';
@@ -23,26 +23,26 @@ export function createRateLimiter(config: RateLimitConfig) {
     const rateLimitService = container.resolve<IRateLimitService>('rateLimitService');
 
     // Generate key for rate limiting
-    const key = config.keyGenerator
+    const endpoint = config.keyGenerator
       ? config.keyGenerator(request)
-      : `${request.ip}:${request.routeOptions.url}`;
+      : `${request.ip}:${request.routeOptions?.url || request.url}`;
 
     // Check rate limit
-    const result = await rateLimitService.checkRateLimit(key, config.max, config.windowMs);
+    const result = await rateLimitService.checkRateLimit(endpoint, endpoint);
 
     // Add rate limit headers
-    reply.header('X-RateLimit-Limit', config.max);
-    reply.header('X-RateLimit-Remaining', Math.max(0, config.max - result.current));
-    reply.header('X-RateLimit-Reset', new Date(result.resetTime).toISOString());
+    void reply.header('X-RateLimit-Limit', config.max.toString());
+    void reply.header('X-RateLimit-Remaining', Math.max(0, result.remaining).toString());
+    void reply.header('X-RateLimit-Reset', result.resetAt.toISOString());
 
     if (!result.allowed) {
-      const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
-      reply.header('Retry-After', retryAfter);
+      const retryAfter = result.retryAfter || 0;
+      void reply.header('Retry-After', retryAfter.toString());
 
       throw new RateLimitError(retryAfter, {
         limit: config.max,
-        current: result.current,
-        resetTime: result.resetTime,
+        remaining: result.remaining,
+        resetAt: result.resetAt,
       });
     }
   };
@@ -112,24 +112,24 @@ export function createTrustBasedRateLimiter(baseConfig: RateLimitConfig) {
 
     const rateLimitService = container.resolve<IRateLimitService>('rateLimitService');
 
-    const key = baseConfig.keyGenerator
+    const endpoint = baseConfig.keyGenerator
       ? baseConfig.keyGenerator(request)
-      : `${request.ip}:${request.routeOptions.url}`;
+      : `${request.ip}:${request.routeOptions?.url || request.url}`;
 
-    const result = await rateLimitService.checkRateLimit(key, adjustedMax, baseConfig.windowMs);
+    const result = await rateLimitService.checkRateLimit(endpoint, endpoint);
 
-    reply.header('X-RateLimit-Limit', adjustedMax);
-    reply.header('X-RateLimit-Remaining', Math.max(0, adjustedMax - result.current));
-    reply.header('X-RateLimit-Reset', new Date(result.resetTime).toISOString());
+    void reply.header('X-RateLimit-Limit', adjustedMax.toString());
+    void reply.header('X-RateLimit-Remaining', Math.max(0, result.remaining).toString());
+    void reply.header('X-RateLimit-Reset', result.resetAt.toISOString());
 
     if (!result.allowed) {
-      const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
-      reply.header('Retry-After', retryAfter);
+      const retryAfter = result.retryAfter || 0;
+      void reply.header('Retry-After', retryAfter.toString());
 
       throw new RateLimitError(retryAfter, {
         limit: adjustedMax,
-        current: result.current,
-        resetTime: result.resetTime,
+        remaining: result.remaining,
+        resetAt: result.resetAt,
       });
     }
   };
