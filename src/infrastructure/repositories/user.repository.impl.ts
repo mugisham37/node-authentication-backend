@@ -3,13 +3,13 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { IUserRepository } from '../../domain/repositories/user.repository.js';
 import { User } from '../../domain/entities/user.entity.js';
 import { Email } from '../../domain/value-objects/email.value-object.js';
-import { users } from '../../core/database/schema/users.schema.js';
-import { oauthAccounts } from '../../core/database/schema/oauth.schema.js';
+import { users, type User as UserRow } from '../database/schema/users.schema.js';
+import { oauthAccounts } from '../database/schema/oauth.schema.js';
 import {
   ConflictError,
   NotFoundError,
   ServiceUnavailableError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * User Repository Implementation using Drizzle ORM
@@ -132,24 +132,33 @@ export class UserRepository implements IUserRepository {
         })
         .returning();
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      const createdUser = result[0];
+      if (!createdUser) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from insert',
+          operation: 'save',
+        });
+      }
+
+      return this.mapToEntity(createdUser);
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation (duplicate email)
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Email already exists', {
           email: user.email.toString(),
         });
       }
 
       // Handle foreign key violation
-      if (error.code === '23503') {
+      if (err.code === '23503') {
         throw new ConflictError('Invalid reference', {
-          originalError: error.message,
+          originalError: err.message || 'Unknown error',
         });
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'save',
       });
     }
@@ -185,21 +194,30 @@ export class UserRepository implements IUserRepository {
         throw new NotFoundError('User');
       }
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      const updatedUser = result[0];
+      if (!updatedUser) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from update',
+          operation: 'update',
+        });
+      }
+
+      return this.mapToEntity(updatedUser);
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Email already exists', {
           email: user.email.toString(),
         });
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'update',
       });
     }
@@ -222,13 +240,14 @@ export class UserRepository implements IUserRepository {
       if (result.length === 0) {
         throw new NotFoundError('User');
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { message?: string };
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'delete',
       });
     }
@@ -236,23 +255,28 @@ export class UserRepository implements IUserRepository {
 
   /**
    * Maps database row to User entity
+   * Maps database schema fields to entity fields
    */
-  private mapToEntity(row: unknown): User {
+  private mapToEntity(row: UserRow): User {
+    // Map database fields to entity fields
+    const fullName = [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown User';
+    const failedAttempts = parseInt(row.failedLoginAttempts || '0', 10);
+    
     return new User({
       id: row.id,
       email: new Email(row.email),
       passwordHash: row.passwordHash,
-      name: row.name,
-      image: row.image,
-      emailVerified: row.emailVerified,
-      emailVerifiedAt: row.emailVerifiedAt,
-      mfaEnabled: row.mfaEnabled,
-      mfaSecret: row.mfaSecret,
-      mfaBackupCodes: row.mfaBackupCodes,
-      accountLocked: row.accountLocked,
-      accountLockedUntil: row.accountLockedUntil,
-      failedLoginAttempts: row.failedLoginAttempts,
-      lastFailedLoginAt: row.lastFailedLoginAt,
+      name: fullName,
+      image: null, // Not in current schema
+      emailVerified: row.isEmailVerified,
+      emailVerifiedAt: null, // Not in current schema
+      mfaEnabled: false, // Not in current schema
+      mfaSecret: null, // Not in current schema
+      mfaBackupCodes: null, // Not in current schema
+      accountLocked: row.isSuspended,
+      accountLockedUntil: row.lockoutUntil,
+      failedLoginAttempts: failedAttempts,
+      lastFailedLoginAt: null, // Not in current schema
       lastLoginAt: row.lastLoginAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

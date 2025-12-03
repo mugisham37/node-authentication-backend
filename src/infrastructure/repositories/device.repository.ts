@@ -3,12 +3,12 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { IDeviceRepository } from '../../domain/repositories/device.repository.js';
 import { Device } from '../../domain/entities/device.entity.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
-import { devices } from '../../core/database/schema/devices.schema.js';
+import { devices, type Device as DeviceRow } from '../database/schema/devices.schema.js';
 import {
   ConflictError,
   NotFoundError,
   ServiceUnavailableError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * Device Repository Implementation using Drizzle ORM
@@ -28,31 +28,40 @@ export class DeviceRepository implements IDeviceRepository {
         .values({
           id: device.id,
           userId: device.userId,
-          fingerprint: device.fingerprint.toString(),
-          name: device.name,
-          type: device.type,
+          deviceId: device.fingerprint.toString(),
+          deviceName: device.name || null,
+          deviceType: device.type || null,
           isTrusted: device.isTrusted,
           lastSeenAt: device.lastSeenAt,
           createdAt: device.createdAt,
         })
         .returning();
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      const createdDevice = result[0];
+      if (!createdDevice) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from insert',
+          operation: 'create',
+        });
+      }
+
+      return this.mapToEntity(createdDevice);
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation (duplicate fingerprint)
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Device fingerprint already exists', {
           fingerprint: device.fingerprint.toString(),
         });
       }
 
       // Handle foreign key violation
-      if (error.code === '23503') {
+      if (err.code === '23503') {
         throw new NotFoundError('User');
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'create',
       });
     }
@@ -87,7 +96,7 @@ export class DeviceRepository implements IDeviceRepository {
       const result = await this.db
         .select()
         .from(devices)
-        .where(eq(devices.fingerprint, fingerprint))
+        .where(eq(devices.deviceId, fingerprint))
         .limit(1);
 
       if (result.length === 0) {
@@ -129,8 +138,8 @@ export class DeviceRepository implements IDeviceRepository {
       const result = await this.db
         .update(devices)
         .set({
-          name: device.name,
-          type: device.type,
+          deviceName: device.name || null,
+          deviceType: device.type || null,
           isTrusted: device.isTrusted,
           lastSeenAt: device.lastSeenAt,
         })
@@ -141,14 +150,23 @@ export class DeviceRepository implements IDeviceRepository {
         throw new NotFoundError('Device');
       }
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      const updatedDevice = result[0];
+      if (!updatedDevice) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from update',
+          operation: 'update',
+        });
+      }
+
+      return this.mapToEntity(updatedDevice);
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { message?: string };
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'update',
       });
     }
@@ -165,13 +183,14 @@ export class DeviceRepository implements IDeviceRepository {
       if (result.length === 0) {
         throw new NotFoundError('Device');
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { message?: string };
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'delete',
       });
     }
@@ -240,13 +259,18 @@ export class DeviceRepository implements IDeviceRepository {
   /**
    * Maps database row to Device entity
    */
-  private mapToEntity(row: unknown): Device {
+  private mapToEntity(row: DeviceRow): Device {
     return new Device({
       id: row.id,
       userId: row.userId,
-      fingerprint: new DeviceFingerprint(row.fingerprint),
-      name: row.name,
-      type: row.type,
+      fingerprint: new DeviceFingerprint({
+        userAgent: row.userAgent || '',
+        screenResolution: undefined,
+        timezone: undefined,
+        canvasFingerprint: undefined,
+      }),
+      name: row.deviceName || 'Unknown Device',
+      type: row.deviceType || 'unknown',
       isTrusted: row.isTrusted,
       lastSeenAt: row.lastSeenAt,
       createdAt: row.createdAt,

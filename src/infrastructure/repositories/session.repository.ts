@@ -2,11 +2,11 @@ import { ISessionRepository } from '../../domain/repositories/session.repository
 import { Session } from '../../domain/entities/session.entity.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
-import * as redis from '../../core/cache/redis.js';
+import * as redis from '../cache/redis.js';
 import {
   ServiceUnavailableError,
   NotFoundError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * Session Repository Implementation using Redis
@@ -54,7 +54,7 @@ export class SessionRepository implements ISessionRepository {
    */
   async findById(id: string): Promise<Session | null> {
     try {
-      const sessionData = await redis.get<any>(`${this.SESSION_PREFIX}${id}`);
+      const sessionData = await redis.get<SessionData>(`${this.SESSION_PREFIX}${id}`);
 
       if (!sessionData) {
         return null;
@@ -78,7 +78,7 @@ export class SessionRepository implements ISessionRepository {
       // Get session ID from token hash
       const sessionId = await redis.get<string>(`${this.SESSION_BY_TOKEN_PREFIX}${tokenHash}`);
 
-      if (!sessionId) {
+      if (!sessionId || typeof sessionId !== 'string') {
         return null;
       }
 
@@ -174,7 +174,7 @@ export class SessionRepository implements ISessionRepository {
       // Remove session ID from user's session set
       const userSessionKey = `${this.SESSION_BY_USER_PREFIX}${session.userId}`;
       const sessionIds = await redis.smembers(userSessionKey);
-      const updatedSessionIds = sessionIds.filter((sid) => sid !== id);
+      const updatedSessionIds = sessionIds.filter((sid: string) => sid !== id);
 
       // Delete the set and recreate with remaining sessions
       await redis.del(userSessionKey);
@@ -230,7 +230,7 @@ export class SessionRepository implements ISessionRepository {
           continue;
         }
 
-        const sessionData = await redis.get<any>(key);
+        const sessionData = await redis.get<SessionData>(key);
         if (sessionData) {
           const session = this.deserializeSession(sessionData);
           sessions.push(session);
@@ -249,7 +249,7 @@ export class SessionRepository implements ISessionRepository {
   /**
    * Serialize session to JSON
    */
-  private serializeSession(session: Session): any {
+  private serializeSession(session: Session): SessionData {
     return {
       id: session.id,
       userId: session.userId,
@@ -271,7 +271,7 @@ export class SessionRepository implements ISessionRepository {
   /**
    * Deserialize JSON to Session entity
    */
-  private deserializeSession(data: any): Session {
+  private deserializeSession(data: SessionData): Session {
     return new Session({
       id: data.id,
       userId: data.userId,
@@ -289,4 +289,24 @@ export class SessionRepository implements ISessionRepository {
       revokedAt: data.revokedAt ? new Date(data.revokedAt) : null,
     });
   }
+}
+
+/**
+ * Type definition for serialized session data
+ */
+interface SessionData {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  deviceFingerprint: string;
+  deviceName: string | null;
+  ipAddress: string;
+  userAgent: string;
+  location: string | null;
+  isTrusted: boolean;
+  trustScore: number;
+  lastActivityAt: string;
+  expiresAt: string;
+  createdAt: string;
+  revokedAt: string | null;
 }

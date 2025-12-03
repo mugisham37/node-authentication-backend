@@ -8,13 +8,15 @@ import {
   permissions,
   userRoles,
   rolePermissions,
-} from '../../core/database/schema/roles.schema.js';
+  type Role as RoleRow,
+  type Permission as PermissionRow,
+} from '../database/schema/roles.schema.js';
 import {
   ConflictError,
   NotFoundError,
   ServiceUnavailableError,
   ValidationError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * Role Repository Implementation using Drizzle ORM
@@ -58,9 +60,9 @@ export class RoleRepository implements IRoleRepository {
       }
 
       // Load permissions for the role
-      const rolePermissions = await this.getPermissions(result[0].id);
+      const rolePerms = await this.getPermissions(result[0].id);
 
-      return this.mapToEntity(result[0], rolePermissions);
+      return this.mapToEntity(result[0], rolePerms);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -78,8 +80,8 @@ export class RoleRepository implements IRoleRepository {
 
       const rolesWithPermissions: Role[] = [];
       for (const roleRow of result) {
-        const rolePermissions = await this.getPermissions(roleRow.id);
-        rolesWithPermissions.push(this.mapToEntity(roleRow, rolePermissions));
+        const rolePerms = await this.getPermissions(roleRow.id);
+        rolesWithPermissions.push(this.mapToEntity(roleRow, rolePerms));
       }
 
       return rolesWithPermissions;
@@ -107,8 +109,8 @@ export class RoleRepository implements IRoleRepository {
 
       const rolesWithPermissions: Role[] = [];
       for (const row of result) {
-        const rolePermissions = await this.getPermissions(row.role.id);
-        rolesWithPermissions.push(this.mapToEntity(row.role, rolePermissions));
+        const rolePerms = await this.getPermissions(row.role.id);
+        rolesWithPermissions.push(this.mapToEntity(row.role, rolePerms));
       }
 
       return rolesWithPermissions;
@@ -130,12 +132,19 @@ export class RoleRepository implements IRoleRepository {
         .values({
           id: role.id,
           name: role.name,
-          description: role.description,
+          description: role.description || null,
           isSystem: role.isSystem,
           createdAt: role.createdAt,
           updatedAt: role.updatedAt,
         })
         .returning();
+
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from insert',
+          operation: 'save',
+        });
+      }
 
       // Add permissions if any
       if (role.permissions.length > 0) {
@@ -145,16 +154,17 @@ export class RoleRepository implements IRoleRepository {
       }
 
       return this.mapToEntity(result[0], role.permissions);
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Role name already exists', {
           name: role.name,
         });
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'save',
       });
     }
@@ -169,7 +179,7 @@ export class RoleRepository implements IRoleRepository {
         .update(roles)
         .set({
           name: role.name,
-          description: role.description,
+          description: role.description || null,
           isSystem: role.isSystem,
           updatedAt: new Date(),
         })
@@ -180,21 +190,29 @@ export class RoleRepository implements IRoleRepository {
         throw new NotFoundError('Role');
       }
 
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from update',
+          operation: 'update',
+        });
+      }
+
       return this.mapToEntity(result[0], role.permissions);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Role name already exists', {
           name: role.name,
         });
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'update',
       });
     }
@@ -225,13 +243,14 @@ export class RoleRepository implements IRoleRepository {
       if (result.length === 0) {
         throw new NotFoundError('Role');
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof NotFoundError || error instanceof ValidationError) {
         throw error;
       }
 
+      const err = error as { message?: string };
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'delete',
       });
     }
@@ -249,20 +268,21 @@ export class RoleRepository implements IRoleRepository {
         assignedBy: assignedBy || null,
         assignedAt: new Date(),
       });
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation (already assigned)
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         // Role already assigned, ignore
         return;
       }
 
       // Handle foreign key violation
-      if (error.code === '23503') {
+      if (err.code === '23503') {
         throw new NotFoundError('User or Role');
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'assignToUser',
       });
     }
@@ -296,20 +316,21 @@ export class RoleRepository implements IRoleRepository {
         permissionId,
         createdAt: new Date(),
       });
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation (already added)
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         // Permission already added, ignore
         return;
       }
 
       // Handle foreign key violation
-      if (error.code === '23503') {
+      if (err.code === '23503') {
         throw new NotFoundError('Role or Permission');
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'addPermission',
       });
     }
@@ -360,11 +381,11 @@ export class RoleRepository implements IRoleRepository {
   /**
    * Maps database row to Role entity
    */
-  private mapToEntity(row: any, permissions: Permission[]): Role {
+  private mapToEntity(row: RoleRow, permissions: Permission[]): Role {
     return new Role({
       id: row.id,
       name: row.name,
-      description: row.description,
+      description: row.description || undefined,
       isSystem: row.isSystem,
       permissions,
       createdAt: row.createdAt,
@@ -375,12 +396,12 @@ export class RoleRepository implements IRoleRepository {
   /**
    * Maps database row to Permission entity
    */
-  private mapPermissionToEntity(row: unknown): Permission {
+  private mapPermissionToEntity(row: PermissionRow): Permission {
     return new Permission({
       id: row.id,
       resource: row.resource,
       action: row.action,
-      description: row.description,
+      description: row.description || '',
       createdAt: row.createdAt,
     });
   }

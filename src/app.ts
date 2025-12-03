@@ -10,7 +10,7 @@ import swaggerUi from '@fastify/swagger-ui';
 import { env } from './infrastructure/config/env.js';
 import { swaggerConfig, swaggerUiConfig } from './infrastructure/config/swagger.config.js';
 import { logger } from './infrastructure/logging/logger.js';
-import { ApplicationError } from './core/errors/types/application-error.js';
+import { ApplicationError } from './shared/errors/types/application-error.js';
 import { randomUUID } from 'crypto';
 
 export interface AppOptions {
@@ -19,7 +19,7 @@ export interface AppOptions {
 
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: options.logger !== false ? logger : false,
+    logger: options.logger !== false,
     genReqId: () => randomUUID(),
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
@@ -159,16 +159,16 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
   // Metrics middleware - track request count and duration
   // Requirements: 22.1
-  const { metricsMiddleware } = await import('./presentation/middleware/metrics.middleware.js');
+  const { metricsMiddleware } = await import('./infrastructure/middleware/metrics.middleware.js');
   app.addHook('onRequest', metricsMiddleware);
 
   // Tracing middleware - create trace spans for all operations
   // Requirements: 22.3
-  const { tracingMiddleware } = await import('./presentation/middleware/tracing.middleware.js');
+  const { tracingMiddleware } = await import('./infrastructure/middleware/tracing.middleware.js');
   app.addHook('onRequest', tracingMiddleware);
 
   // Request logging middleware
-  app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.addHook('onRequest', async (request: FastifyRequest, _reply: FastifyReply) => {
     request.log.info(
       {
         requestId: request.id,
@@ -184,7 +184,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // Audit logging middleware for security events
   // Requirements: 13.1, 13.2, 19.3
   const { auditLoggingMiddleware } =
-    await import('./presentation/middleware/audit-logging.middleware.js');
+    await import('./infrastructure/middleware/audit-logging.middleware.js');
   app.addHook('onRequest', auditLoggingMiddleware);
 
   // Response logging middleware
@@ -204,7 +204,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   // Global error handler
   app.setErrorHandler(async (error: Error, request: FastifyRequest, reply: FastifyReply) => {
     const requestId = request.id;
-    const userId = (request as any).user?.id;
+    const userId = (request as FastifyRequest & { user?: { id?: string } }).user?.id;
 
     // Log error with full context
     request.log.error(
@@ -229,8 +229,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     // Send alert for non-operational errors (Requirement 18.4)
     if (error instanceof ApplicationError && !error.isOperational) {
       const { alertingService, AlertSeverity } =
-        await import('./core/monitoring/alerting.service.js');
-      await alertingService.alertSecurityEvent(
+        await import('./infrastructure/monitoring/alerting.service.js');
+      alertingService.alertSecurityEvent(
         'non_operational_error',
         AlertSeverity.CRITICAL,
         `Non-operational error: ${error.message}`,
@@ -257,12 +257,12 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
     }
 
     // Handle Fastify validation errors
-    if (error.name === 'FastifyError' && (error as unknown).validation) {
+    if (error.name === 'FastifyError' && 'validation' in error) {
       return reply.status(400).send({
         error: {
           type: 'ValidationError',
           message: 'Request validation failed',
-          details: (error as unknown).validation,
+          details: (error as { validation?: unknown }).validation,
           requestId,
         },
       });
@@ -305,36 +305,38 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
  * Register all application routes
  */
 async function registerRoutes(app: FastifyInstance): Promise<void> {
-  const { authRoutes } = await import('./presentation/routes/auth.routes.js');
-  const { mfaRoutes } = await import('./presentation/routes/mfa.routes.js');
+  const { authRoutes } = await import('./api/rest/presentation/routes/auth.routes.js');
+  const { mfaRoutes } = await import('./api/rest/presentation/routes/mfa.routes.js');
   const { passwordlessRoutes } =
-    await import('./modules/passwordless/presentation/controllers/passwordless.controller.js');
-  const { oauthRoutes } = await import('./presentation/routes/oauth.routes.js');
-  const { sessionRoutes } = await import('./presentation/routes/session.routes.js');
-  const { deviceRoutes } = await import('./presentation/routes/device.routes.js');
-  const { userRoutes } = await import('./presentation/routes/user.routes.js');
-  const { adminRoutes } = await import('./presentation/routes/admin.routes.js');
-  const { webhookRoutes } = await import('./presentation/routes/webhook.routes.js');
-  const { monitoringRoutes } = await import('./presentation/routes/monitoring.routes.js');
-  const { setupWebSocketRoutes } = await import('./presentation/websocket/websocket-handler.js');
+    await import('./api/rest/presentation/controllers/passwordless.controller.js');
+  const { oauthRoutes } = await import('./api/rest/presentation/routes/oauth.routes.js');
+  const { sessionRoutes } = await import('./api/rest/presentation/routes/session.routes.js');
+  const { deviceRoutes } = await import('./api/rest/presentation/routes/device.routes.js');
+  const { userRoutes } = await import('./api/rest/presentation/routes/user.routes.js');
+  // Admin routes - to be implemented
+  // const { adminRoutes } = await import('./api/rest/presentation/routes/admin.routes.js');
+  const { webhookRoutes } = await import('./api/rest/presentation/routes/webhook.routes.js');
+  const { monitoringRoutes } = await import('./api/rest/presentation/routes/monitoring.routes.js');
+  const { setupWebSocketRoutes } = await import('./api/rest/websocket/websocket-handler.js');
 
   // Register all routes
   await authRoutes(app);
   await mfaRoutes(app);
   await passwordlessRoutes(app);
-  await oauthRoutes(app);
+  oauthRoutes(app);
   await sessionRoutes(app);
   await deviceRoutes(app);
   await userRoutes(app);
-  await adminRoutes(app);
+  // TODO: Implement admin routes
+  // await adminRoutes(app);
   await webhookRoutes(app);
   await monitoringRoutes(app);
 
   // Register WebSocket routes
-  await setupWebSocketRoutes(app);
+  setupWebSocketRoutes(app);
 
   // Root health check
-  app.get('/health', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/health', async (_request: FastifyRequest, reply: FastifyReply) => {
     return reply.status(200).send({
       status: 'ok',
       timestamp: new Date().toISOString(),
@@ -373,7 +375,7 @@ export async function gracefulShutdown(app: FastifyInstance): Promise<void> {
 
   try {
     // Close all WebSocket connections
-    const { connectionManager } = await import('./presentation/websocket/connection-manager.js');
+    const { connectionManager } = await import('./api/rest/websocket/connection-manager.js');
     connectionManager.closeAllConnections();
     logger.info('All WebSocket connections closed');
 
@@ -381,7 +383,7 @@ export async function gracefulShutdown(app: FastifyInstance): Promise<void> {
     logger.info('Server closed successfully');
 
     // Shutdown distributed tracing (Requirement 22.3)
-    const { shutdownTracing } = await import('./core/monitoring/tracing.js');
+    const { shutdownTracing } = await import('./infrastructure/monitoring/tracing.js');
     await shutdownTracing();
     logger.info('Distributed tracing shutdown complete');
 

@@ -1,8 +1,8 @@
 import { buildApp, startServer, gracefulShutdown } from './app.js';
 import { logger } from './infrastructure/logging/logger.js';
-import { initializeTracing, shutdownTracing } from './core/monitoring/tracing.js';
+import { initializeTracing } from './infrastructure/monitoring/tracing.js';
 
-async function main() {
+async function main(): Promise<void> {
   try {
     // Initialize distributed tracing (Requirement 22.3)
     initializeTracing();
@@ -14,20 +14,22 @@ async function main() {
     await startServer(app);
 
     // Handle graceful shutdown
-    const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
+    const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT'] as const;
     signals.forEach((signal) => {
-      process.on(signal, () => gracefulShutdown(app));
+      process.on(signal, () => {
+        void gracefulShutdown(app);
+      });
     });
 
     // Handle uncaught errors
-    process.on('uncaughtException', (error) => {
+    process.on('uncaughtException', (error: Error) => {
       logger.error('Uncaught exception:', error);
-      gracefulShutdown(app);
+      void gracefulShutdown(app);
     });
 
-    process.on('unhandledRejection', (reason, promise) => {
+    process.on('unhandledRejection', (reason: unknown, promise: Promise<unknown>) => {
       logger.error('Unhandled rejection at:', promise, 'reason:', reason);
-      gracefulShutdown(app);
+      void gracefulShutdown(app);
     });
   } catch (error) {
     logger.error('Failed to start application:', error);

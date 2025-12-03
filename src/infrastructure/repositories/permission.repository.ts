@@ -6,12 +6,13 @@ import {
   permissions,
   rolePermissions,
   userRoles,
-} from '../../core/database/schema/roles.schema.js';
+  type Permission as PermissionRow,
+} from '../database/schema/roles.schema.js';
 import {
   ConflictError,
   NotFoundError,
   ServiceUnavailableError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * Permission Repository Implementation using Drizzle ORM
@@ -148,10 +149,19 @@ export class PermissionRepository implements IPermissionRepository {
         })
         .returning();
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      const createdPermission = result[0];
+      if (!createdPermission) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from insert',
+          operation: 'save',
+        });
+      }
+
+      return this.mapToEntity(createdPermission);
+    } catch (error) {
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Permission already exists', {
           resource: permission.resource,
           action: permission.action,
@@ -159,7 +169,7 @@ export class PermissionRepository implements IPermissionRepository {
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'save',
       });
     }
@@ -184,14 +194,23 @@ export class PermissionRepository implements IPermissionRepository {
         throw new NotFoundError('Permission');
       }
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      const updatedPermission = result[0];
+      if (!updatedPermission) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'No result returned from update',
+          operation: 'update',
+        });
+      }
+
+      return this.mapToEntity(updatedPermission);
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { code?: string; message?: string };
       // Handle unique constraint violation
-      if (error.code === '23505') {
+      if (err.code === '23505') {
         throw new ConflictError('Permission already exists', {
           resource: permission.resource,
           action: permission.action,
@@ -199,7 +218,7 @@ export class PermissionRepository implements IPermissionRepository {
       }
 
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'update',
       });
     }
@@ -215,13 +234,14 @@ export class PermissionRepository implements IPermissionRepository {
       if (result.length === 0) {
         throw new NotFoundError('Permission');
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const err = error as { message?: string };
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: err.message || 'Unknown error',
         operation: 'delete',
       });
     }
@@ -230,12 +250,12 @@ export class PermissionRepository implements IPermissionRepository {
   /**
    * Maps database row to Permission entity
    */
-  private mapToEntity(row: any): Permission {
+  private mapToEntity(row: PermissionRow): Permission {
     return new Permission({
       id: row.id,
       resource: row.resource,
       action: row.action,
-      description: row.description,
+      description: row.description || '',
       createdAt: row.createdAt,
     });
   }
