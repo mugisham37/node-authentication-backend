@@ -27,13 +27,21 @@ const envSchema = z.object({
     .default('false'),
 
   // JWT
+  JWT_SECRET: z.string().min(32),
   JWT_ACCESS_TOKEN_SECRET: z.string().min(32),
   JWT_REFRESH_TOKEN_SECRET: z.string().min(32),
   JWT_ACCESS_TOKEN_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_TOKEN_EXPIRY: z.string().default('7d'),
   JWT_ALGORITHM: z.string().default('RS256'),
+  JWT_ISSUER: z.string().default('enterprise-auth-system'),
+  JWT_AUDIENCE: z.string().default('enterprise-auth-api'),
+  JWT_PRIVATE_KEY: z.string().optional(),
+  JWT_PUBLIC_KEY: z.string().optional(),
   JWT_PRIVATE_KEY_PATH: z.string().optional(),
   JWT_PUBLIC_KEY_PATH: z.string().optional(),
+
+  // Encryption
+  ENCRYPTION_KEY: z.string().length(64).optional(), // 32 bytes as hex (64 chars)
 
   // Password Hashing
   ARGON2_TIME_COST: z.string().transform(Number).default('2'),

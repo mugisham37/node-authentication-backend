@@ -10,14 +10,13 @@ import { logger } from '../../logging/logger.js';
 export class AesEncryptionService {
   private static readonly ALGORITHM = 'aes-256-gcm';
   private static readonly IV_LENGTH = 16; // 128 bits
-  private static readonly TAG_LENGTH = 16; // 128 bits
 
   /**
    * Get encryption key from environment
    * Key should be 32 bytes (256 bits) for AES-256
    */
   private static getEncryptionKey(): Buffer {
-    const key = env.ENCRYPTION_KEY;
+    const key: string | undefined = env.ENCRYPTION_KEY;
     if (!key) {
       throw new Error('ENCRYPTION_KEY environment variable is not set');
     }
@@ -116,6 +115,9 @@ export class AesEncryptionService {
     }
 
     const [iv, tag, encrypted] = parts;
+    if (!iv || !tag || !encrypted) {
+      throw new Error('Invalid encrypted string format');
+    }
     return this.decrypt(encrypted, iv, tag);
   }
 

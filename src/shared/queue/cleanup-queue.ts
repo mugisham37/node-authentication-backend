@@ -5,6 +5,7 @@
  */
 
 import { Queue, Worker, Job } from 'bullmq';
+import type { RepeatableJob } from 'bullmq';
 import { Redis } from 'ioredis';
 import { logger } from '../../shared/logging/logger.js';
 import {
@@ -14,8 +15,8 @@ import {
   DeviceCleanupJobData,
 } from './jobs/cleanup-jobs.js';
 import { CleanupProcessor } from './processors/cleanup-processor.js';
-import type { ISessionRepository } from '../../domain/repositories/session.repository.js';
-import type { IDeviceRepository } from '../../domain/repositories/device.repository.js';
+import type { ISessionRepository } from '../domain/repositories/session.repository.js';
+import type { IDeviceRepository } from '../domain/repositories/device.repository.js';
 
 export class CleanupQueue {
   private queue: Queue;
@@ -219,7 +220,7 @@ export class CleanupQueue {
   /**
    * Get scheduled jobs
    */
-  async getScheduledJobs() {
+  async getScheduledJobs(): Promise<RepeatableJob[]> {
     return await this.queue.getRepeatableJobs();
   }
 

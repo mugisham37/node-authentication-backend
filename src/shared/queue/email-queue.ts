@@ -118,10 +118,11 @@ export class EmailQueue {
       throw new Error('Email processor not initialized. Provide emailService in constructor.');
     }
 
+    const processor = this.processor;
     this.worker = new Worker<EmailJobData>(
       'email',
       async (job: Job<EmailJobData>) => {
-        await this.processor!.process(job);
+        await processor.process(job);
       },
       {
         connection: this.connection,

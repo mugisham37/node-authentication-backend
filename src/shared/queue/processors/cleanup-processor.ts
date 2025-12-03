@@ -12,8 +12,8 @@ import {
   DeviceCleanupJobData,
   CLEANUP_JOB_TYPES,
 } from '../jobs/cleanup-jobs.js';
-import type { ISessionRepository } from '../../../domain/repositories/session.repository.js';
-import type { IDeviceRepository } from '../../../domain/repositories/device.repository.js';
+import type { ISessionRepository } from '../../domain/repositories/session.repository.js';
+import type { IDeviceRepository } from '../../domain/repositories/device.repository.js';
 import { getRedis } from '../../../shared/cache/redis.js';
 
 export interface CleanupResult {
@@ -90,12 +90,26 @@ export class CleanupProcessor {
     logger.info('Starting expired session cleanup', { batchSize });
 
     try {
-      // Delete expired sessions
-      // Note: deleteExpired method needs to be implemented in ISessionRepository
-      const deletedCount =
-        'deleteExpired' in this.sessionRepository
-          ? await (this.sessionRepository as any).deleteExpired(batchSize)
-          : 0;
+      // Fetch all sessions and check for expired ones
+      const sessions = await this.sessionRepository.findAll();
+      const now = new Date();
+      let deletedCount = 0;
+
+      for (const session of sessions) {
+        // Skip if session hasn't expired yet
+        if (!session.expiresAt || session.expiresAt >= now) {
+          continue;
+        }
+
+        // Delete expired session
+        await this.sessionRepository.delete(session.id);
+        deletedCount++;
+
+        // Stop if we've reached the batch limit
+        if (deletedCount >= batchSize) {
+          break;
+        }
+      }
 
       logger.info('Expired sessions cleaned up', {
         deletedCount,
@@ -178,29 +192,19 @@ export class CleanupProcessor {
       throw new Error('Device repository not provided');
     }
 
-    const batchSize = data.batchSize || 1000;
     const inactiveDays = data.inactiveDays || 90;
 
     logger.info('Starting unused device cleanup', {
-      batchSize,
       inactiveDays,
     });
 
     try {
-      // Calculate cutoff date
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - inactiveDays);
-
-      // Delete devices not seen since cutoff date
-      // Note: deleteInactive method needs to be implemented in IDeviceRepository
-      const deletedCount =
-        'deleteInactive' in this.deviceRepository
-          ? await (this.deviceRepository as unknown).deleteInactive(cutoffDate, batchSize)
-          : 0;
+      // Use the existing deleteUnusedDevices method from IDeviceRepository
+      const deletedCount = await this.deviceRepository.deleteUnusedDevices(inactiveDays);
 
       logger.info('Unused devices cleaned up', {
         deletedCount,
-        cutoffDate,
+        inactiveDays,
       });
 
       return {

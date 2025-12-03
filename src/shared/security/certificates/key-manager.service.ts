@@ -30,15 +30,18 @@ export class KeyManagerService {
       }
 
       // Fall back to environment variable
-      if (env.JWT_PRIVATE_KEY) {
-        this.jwtPrivateKey = env.JWT_PRIVATE_KEY.replace(/\\n/g, '\n');
+      const privateKeyEnv: string | undefined = env.JWT_PRIVATE_KEY;
+      if (privateKeyEnv) {
+        const formattedKey: string = privateKeyEnv.replace(/\\n/g, '\n');
+        this.jwtPrivateKey = formattedKey;
         logger.info('JWT private key loaded from environment');
         return this.jwtPrivateKey;
       }
 
-      // If neither exists, generate a warning
+      // If neither exists, use symmetric key
       logger.warn('JWT private key not found, using symmetric key instead');
-      return env.JWT_SECRET;
+      const secret: string = env.JWT_SECRET;
+      return secret;
     } catch (error) {
       logger.error('Failed to load JWT private key', error as Error);
       throw new Error('JWT private key loading failed');
@@ -63,15 +66,18 @@ export class KeyManagerService {
       }
 
       // Fall back to environment variable
-      if (env.JWT_PUBLIC_KEY) {
-        this.jwtPublicKey = env.JWT_PUBLIC_KEY.replace(/\\n/g, '\n');
+      const publicKeyEnv: string | undefined = env.JWT_PUBLIC_KEY;
+      if (publicKeyEnv) {
+        const formattedKey: string = publicKeyEnv.replace(/\\n/g, '\n');
+        this.jwtPublicKey = formattedKey;
         logger.info('JWT public key loaded from environment');
         return this.jwtPublicKey;
       }
 
-      // If neither exists, generate a warning
+      // If neither exists, use symmetric key
       logger.warn('JWT public key not found, using symmetric key instead');
-      return env.JWT_SECRET;
+      const secret: string = env.JWT_SECRET;
+      return secret;
     } catch (error) {
       logger.error('Failed to load JWT public key', error as Error);
       throw new Error('JWT public key loading failed');

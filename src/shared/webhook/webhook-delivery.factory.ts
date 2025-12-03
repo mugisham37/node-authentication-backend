@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 import { WebhookDeliveryService } from './webhook-delivery.service.impl.js';
-import { WebhookQueue } from '../../core/queue/webhook-queue.js';
-import { logger } from '../../shared/logging/logger.js';
+import { WebhookQueue } from '../queue/webhook-queue.js';
+import { logger } from '../logging/logger.js';
 
 export class WebhookDeliveryServiceFactory {
   static create(redisConnection: Redis): WebhookDeliveryService {
@@ -9,9 +9,7 @@ export class WebhookDeliveryServiceFactory {
     const webhookDeliveryService = new WebhookDeliveryService(webhookQueue);
 
     // Start the webhook worker to process queued jobs
-    webhookQueue.startWorker(async (job) => {
-      await webhookDeliveryService.deliverWebhook(job.data, job.attemptsMade + 1);
-    });
+    webhookQueue.startWorker();
 
     logger.info('Webhook delivery service factory initialized');
 

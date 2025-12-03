@@ -1,14 +1,14 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import jwt from 'jsonwebtoken';
-import { env } from '../config/env.js';
-import { AuthenticationError } from '../../core/errors/types/application-error.js';
+import { JwtService, JwtPayload } from '../security/tokens/jwt.service.js';
+import { AuthenticationError } from '../../shared/errors/types/application-error.js';
 import { userContextStorage } from '../logging/logger.js';
 
 export interface TokenPayload {
   userId: string;
-  email: string;
+  email?: string;
   sessionId?: string;
   roles?: string[];
+  permissions?: string[];
   iat?: number;
   exp?: number;
 }
@@ -19,7 +19,9 @@ export interface AuthenticatedRequest extends FastifyRequest {
 
 /**
  * Authentication middleware that verifies JWT access tokens
+ * Uses centralized JwtService for token verification
  * Extracts token from Authorization header, validates it, and attaches user to request
+ * Requirements: 3.7, 7.2, 19.1
  */
 export async function authenticationMiddleware(
   request: FastifyRequest,
@@ -45,38 +47,43 @@ export async function authenticationMiddleware(
       throw new AuthenticationError('No token provided');
     }
 
-    // Verify and decode token
-    let decoded: TokenPayload;
+    // Verify and decode token using centralized JwtService
+    let decoded: JwtPayload;
     try {
-      decoded = jwt.verify(token, env.JWT_ACCESS_TOKEN_SECRET, {
-        algorithms: [env.JWT_ALGORITHM as jwt.Algorithm],
-      }) as TokenPayload;
+      decoded = JwtService.verifyAccessToken(token);
     } catch (error) {
-      if (error instanceof jwt.TokenExpiredError) {
-        throw new AuthenticationError('Access token has expired', {
-          expiredAt: error.expiredAt,
-        });
+      if (error instanceof Error) {
+        if (error.name === 'TokenExpiredError') {
+          throw new AuthenticationError('Access token has expired');
+        }
+        if (error.name === 'JsonWebTokenError') {
+          throw new AuthenticationError('Invalid access token', {
+            reason: error.message,
+          });
+        }
       }
-
-      if (error instanceof jwt.JsonWebTokenError) {
-        throw new AuthenticationError('Invalid access token', {
-          reason: error.message,
-        });
-      }
-
       throw new AuthenticationError('Token verification failed');
     }
 
     // Validate token payload
-    if (!decoded.userId || !decoded.email) {
+    if (!decoded.userId) {
       throw new AuthenticationError('Invalid token payload');
     }
 
     // Attach user to request
-    (request as AuthenticatedRequest).user = decoded;
+    (request as AuthenticatedRequest).user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      sessionId: decoded.sessionId,
+      roles: decoded.roles,
+      permissions: decoded.permissions,
+    };
 
     // Set user context for logging (Requirement 22.2)
-    userContextStorage.enterWith({ userId: decoded.userId, email: decoded.email });
+    userContextStorage.enterWith({
+      userId: decoded.userId,
+      email: decoded.email || 'unknown',
+    });
   } catch (error) {
     if (error instanceof AuthenticationError) {
       throw error;
@@ -87,6 +94,7 @@ export async function authenticationMiddleware(
 
 /**
  * Optional authentication middleware that doesn't throw if no token is provided
+ * Uses centralized JwtService for token verification
  * Useful for endpoints that work with or without authentication
  */
 export async function optionalAuthenticationMiddleware(
@@ -106,15 +114,22 @@ export async function optionalAuthenticationMiddleware(
       return;
     }
 
-    const decoded = jwt.verify(token, env.JWT_ACCESS_TOKEN_SECRET, {
-      algorithms: [env.JWT_ALGORITHM as jwt.Algorithm],
-    }) as TokenPayload;
+    const decoded = JwtService.verifyAccessToken(token);
 
-    if (decoded.userId && decoded.email) {
-      (request as AuthenticatedRequest).user = decoded;
+    if (decoded.userId) {
+      (request as AuthenticatedRequest).user = {
+        userId: decoded.userId,
+        email: decoded.email,
+        sessionId: decoded.sessionId,
+        roles: decoded.roles,
+        permissions: decoded.permissions,
+      };
 
       // Set user context for logging (Requirement 22.2)
-      userContextStorage.enterWith({ userId: decoded.userId, email: decoded.email });
+      userContextStorage.enterWith({
+        userId: decoded.userId,
+        email: decoded.email || 'unknown',
+      });
     }
   } catch (error) {
     // Silently fail for optional authentication

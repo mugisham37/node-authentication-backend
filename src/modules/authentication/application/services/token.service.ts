@@ -169,7 +169,10 @@ export class TokenService implements ITokenService {
         payload.sessionId
       );
 
-      logger.info('Access token refreshed', { userId: payload.userId, sessionId: payload.sessionId });
+      logger.info('Access token refreshed', {
+        userId: payload.userId,
+        sessionId: payload.sessionId,
+      });
 
       return {
         accessToken,
@@ -241,215 +244,21 @@ export class TokenService implements ITokenService {
    * Verify password reset token
    * Requirements: 10.2
    */
-  verifyResetToken(token: string): { userId: string; ema
-   */
-  hashRefreshToken(token: string): string {
-    // Use SHA-256 for hashing refresh tokens
-    return createHash('sha256').update(token).digest('hex');
-  }
-
-  /**
-   * Refresh tokens with rotation
-   * Requirements: 6.1, 6.6, 6.7
-   */
-  async refreshTokens(refreshToken: string, userId: string): Promise<RefreshOutput> {
-    const tokenHash = this.hashRefreshToken(refreshToken);
-
-    // Check if token is revoked (Requirement 6.3)
-    const isRevoked = await this.isRefreshTokenRevoked(tokenHash);
-    if (isRevoked) {
-      throw new AuthenticationError('Refresh token has been revoked');
-    }
-
-    // Detect token reuse (Requirement 6.7)
-    const isReused = await this.detectTokenReuse(tokenHash);
-    if (isReused) {
-      // Token reuse detected - revoke entire family
-      const familyData = await this.getTokenFamily(tokenHash);
-      if (familyData) {
-        await this.revokeTokenFamily(familyData.familyId);
-        log.warn('Token reuse detected, revoking token family', {
-          userId,
-          familyId: familyData.familyId,
-        });
-      }
-      throw new AuthenticationError('Token reuse detected. All sessions have been terminated.');
-    }
-
-    // Mark current token as used (for reuse detection)
-    await this.markTokenAsUsed(tokenHash);
-
-    // Revoke old refresh token (Requirement 6.6)
-    await this.revokeRefreshToken(tokenHash);
-
-    // Generate new token pair
-    const newRefreshToken = this.generateRefreshToken();
-    const newTokenHash = this.hashRefreshToken(newRefreshToken);
-
-    // Get family ID from old token
-    const familyData = await this.getTokenFamily(tokenHash);
-    const familyId = familyData?.familyId || randomBytes(16).toString('hex');
-
-    // Track new token in same family (Requirement 6.7)
-    await this.trackTokenInFamily(newTokenHash, familyId, userId);
-
-    const now = Date.now();
-    const accessTokenExpiresAt = new Date(now + this.ACCESS_TOKEN_EXPIRY * 1000);
-    const refreshTokenExpiresAt = new Date(now + this.REFRESH_TOKEN_EXPIRY * 1000);
-
-    // Generate new access token
-    // Note: We need the user object to generate access token
-    // In production, this would be fetched from the repository
-    const accessToken = jwt.sign(
-      {
-        userId,
-        iat: Math.floor(now / 1000),
-        exp: Math.floor(now / 1000) + this.ACCESS_TOKEN_EXPIRY,
-      },
-      this.privateKey,
-      { algorithm: 'RS256' }
-    );
-
-    return {
-      accessToken,
-      refreshToken: newRefreshToken,
-      accessTokenExpiresAt,
-      refreshTokenExpiresAt,
-    };
-  }
-
-  /**
-   * Revoke refresh token
-   * Requirements: 6.3
-   */
-  async revokeRefreshToken(tokenHash: string): Promise<void> {
+  verifyResetToken(token: string): { userId: string; email: string } {
     try {
-      // Store revoked token in Redis with TTL
-      await redis.set(`revoked:token:${tokenHash}`, true, this.REVOKED_TOKEN_TTL);
-      log.info('Refresh token revoked', { tokenHash: tokenHash.substring(0, 8) });
-    } catch (error) {
-      log.error('Failed to revoke refresh token', error as Error);
-      throw error;
-    }
-  }
+      const payload = JwtService.verifyResetToken(token);
 
-  /**
-   * Check if refresh token is revoked
-   * Requirements: 6.3
-   */
-  async isRefreshTokenRevoked(tokenHash: string): Promise<boolean> {
-    try {
-      const revoked = await redis.get<boolean>(`revoked:token:${tokenHash}`);
-      return revoked === true;
-    } catch (error) {
-      log.error('Failed to check token revocation status', error as Error);
-      // Fail closed - assume revoked if we can't check
-      return true;
-    }
-  }
-
-  /**
-   * Revoke entire token family (for reuse detection)
-   * Requirements: 6.7
-   */
-  async revokeTokenFamily(familyId: string): Promise<void> {
-    try {
-      // Mark family as revoked
-      await redis.set(`revoked:family:${familyId}`, Date.now(), this.TOKEN_FAMILY_TTL);
-
-      // Get all tokens in family and revoke them
-      const familyData = await redis.get<TokenFamily>(`token:family:${familyId}`);
-      if (familyData && familyData.tokenHashes) {
-        for (const tokenHash of familyData.tokenHashes) {
-          await this.revokeRefreshToken(tokenHash);
-        }
+      if (!payload.email) {
+        throw new Error('Invalid reset token: missing email');
       }
 
-      log.warn('Token family revoked', { familyId });
+      return {
+        userId: payload.userId,
+        email: payload.email,
+      };
     } catch (error) {
-      log.error('Failed to revoke token family', error as Error);
+      logger.error('Failed to verify reset token', error as Error);
       throw error;
-    }
-  }
-
-  /**
-   * Track token in family for reuse detection
-   * Requirements: 6.7
-   */
-  async trackTokenInFamily(tokenHash: string, familyId: string, userId: string): Promise<void> {
-    try {
-      // Get existing family data or create new
-      let familyData = await redis.get<TokenFamily>(`token:family:${familyId}`);
-
-      if (!familyData) {
-        familyData = {
-          userId,
-          familyId,
-          tokenHashes: [],
-          createdAt: new Date(),
-        };
-      }
-
-      // Add token to family
-      familyData.tokenHashes.push(tokenHash);
-
-      // Store family data
-      await redis.set(`token:family:${familyId}`, familyData, this.TOKEN_FAMILY_TTL);
-
-      // Store reverse mapping (token -> family)
-      await redis.set(`token:family:map:${tokenHash}`, familyId, this.TOKEN_FAMILY_TTL);
-    } catch (error) {
-      log.error('Failed to track token in family', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if token has been reused
-   * Requirements: 6.7
-   */
-  async detectTokenReuse(tokenHash: string): Promise<boolean> {
-    try {
-      // Check if token has been marked as used
-      const used = await redis.get<boolean>(`token:used:${tokenHash}`);
-      return used === true;
-    } catch (error) {
-      log.error('Failed to detect token reuse', error as Error);
-      // Fail closed - assume reused if we can't check
-      return true;
-    }
-  }
-
-  /**
-   * Mark token as used (for reuse detection)
-   * Requirements: 6.7
-   */
-  private async markTokenAsUsed(tokenHash: string): Promise<void> {
-    try {
-      await redis.set(`token:used:${tokenHash}`, true, this.REVOKED_TOKEN_TTL);
-    } catch (error) {
-      log.error('Failed to mark token as used', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get token family data
-   * Requirements: 6.7
-   */
-  private async getTokenFamily(tokenHash: string): Promise<TokenFamily | null> {
-    try {
-      // Get family ID from reverse mapping
-      const familyId = await redis.get<string>(`token:family:map:${tokenHash}`);
-      if (!familyId) {
-        return null;
-      }
-
-      // Get family data
-      return redis.get<TokenFamily>(`token:family:${familyId}`);
-    } catch (error) {
-      log.error('Failed to get token family', error as Error);
-      return null;
     }
   }
 }

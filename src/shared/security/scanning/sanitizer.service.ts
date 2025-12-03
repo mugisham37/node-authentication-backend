@@ -12,7 +12,9 @@ export class SanitizerService {
    * @returns string - Sanitized HTML
    */
   static sanitizeHtml(input: string): string {
-    if (!input) return '';
+    if (!input) {
+      return '';
+    }
 
     try {
       // Remove script tags and their content
@@ -42,7 +44,9 @@ export class SanitizerService {
    * @returns string - Plain text without HTML
    */
   static stripHtml(input: string): string {
-    if (!input) return '';
+    if (!input) {
+      return '';
+    }
     return input.replace(/<[^>]*>/g, '').trim();
   }
 
@@ -53,7 +57,9 @@ export class SanitizerService {
    * @returns string - Sanitized SQL
    */
   static sanitizeSql(input: string): string {
-    if (!input) return '';
+    if (!input) {
+      return '';
+    }
 
     try {
       // Escape single quotes
@@ -93,7 +99,9 @@ export class SanitizerService {
    * @returns boolean - True if safe
    */
   static validateNoScriptInjection(input: string): boolean {
-    if (!input) return true;
+    if (!input) {
+      return true;
+    }
 
     const dangerousPatterns = [
       /<script/i,
@@ -121,7 +129,9 @@ export class SanitizerService {
    * @returns string - Safe filename
    */
   static sanitizeFilename(filename: string): string {
-    if (!filename) return '';
+    if (!filename) {
+      return '';
+    }
 
     try {
       // Remove path separators
@@ -156,7 +166,9 @@ export class SanitizerService {
    * @returns string | null - Sanitized URL or null if invalid
    */
   static sanitizeUrl(url: string, allowedDomains: string[] = []): string | null {
-    if (!url) return null;
+    if (!url) {
+      return null;
+    }
 
     try {
       const parsed = new URL(url);
@@ -189,7 +201,9 @@ export class SanitizerService {
    * @returns string - Sanitized email
    */
   static sanitizeEmail(email: string): string {
-    if (!email) return '';
+    if (!email) {
+      return '';
+    }
 
     // Convert to lowercase and trim
     let sanitized = email.toLowerCase().trim();
@@ -206,7 +220,9 @@ export class SanitizerService {
    * @returns string - Sanitized phone number
    */
   static sanitizePhoneNumber(phone: string): string {
-    if (!phone) return '';
+    if (!phone) {
+      return '';
+    }
 
     // Remove all non-digit characters except leading +
     let sanitized = phone.replace(/[^\d+]/g, '');

@@ -22,7 +22,8 @@ export class EmailProcessor {
    * Process email jobs based on job type
    */
   async process(job: Job): Promise<void> {
-    const { name, data } = job;
+    const name = job.name;
+    const data: unknown = job.data;
 
     logger.info('Processing email job', {
       jobId: job.id,
@@ -50,7 +51,7 @@ export class EmailProcessor {
 
         default:
           logger.warn('Unknown email job type', { jobType: name });
-          throw new Error(`Unknown email job type: ${name}`);
+          throw new Error(`Unknown email job type: ${String(name)}`);
       }
 
       logger.info('Email job completed successfully', {

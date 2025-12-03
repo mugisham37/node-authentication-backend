@@ -2,9 +2,9 @@ import type {
   IWebhookDeliveryService,
   WebhookEvent,
   WebhookDeliveryResult,
-} from '../../shared/application/services/webhook-delivery.service.js';
-import { WebhookQueue } from '../../core/queue/webhook-queue.js';
-import { logger } from '../../shared/logging/logger.js';
+} from '../application/services/webhook-delivery.service.js';
+import { WebhookQueue } from '../queue/webhook-queue.js';
+import { logger } from '../logging/logger.js';
 import { HmacService } from '../security/hashing/hmac.service.js';
 
 export class WebhookDeliveryService implements IWebhookDeliveryService {
@@ -20,7 +20,11 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
   async publishEvent(event: WebhookEvent): Promise<void> {
     try {
       await this.webhookQueue.addWebhookJob({
-        ...event,
+        webhookId: event.webhookId,
+        webhookUrl: event.webhookUrl,
+        webhookSecret: event.secret,
+        eventType: event.type,
+        payload: event.payload,
         attemptCount: 0,
       });
 
@@ -40,7 +44,11 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
 
   async deliverWebhook(event: WebhookEvent, attemptCount: number): Promise<WebhookDeliveryResult> {
     const timestamp = Math.floor(Date.now() / 1000);
-    const { signature } = HmacService.generateWebhookSignature(event.payload, event.secret, timestamp);
+    const { signature } = HmacService.generateWebhookSignature(
+      event.payload,
+      event.secret,
+      timestamp
+    );
 
     try {
       const controller = new AbortController();
@@ -113,7 +121,23 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
     }
   }
 
-  async getQueueMetrics() {
+  async getQueueMetrics(): Promise<{
+    waiting: number;
+    active: number;
+    completed: number;
+    failed: number;
+    delayed: number;
+  }> {
     return this.webhookQueue.getQueueMetrics();
+  }
+
+  generateSignature(payload: string, secret: string): string {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const { signature } = HmacService.generateWebhookSignature(
+      JSON.parse(payload) as Record<string, unknown>,
+      secret,
+      timestamp
+    );
+    return signature;
   }
 }

@@ -61,12 +61,14 @@ export class Argon2Service {
     // Format: $argon2id$v=19$m=65536,t=3,p=4$...
     try {
       const params = hash.split('$')[3];
-      if (!params) return true;
+      if (!params) {
+        return true;
+      }
 
       const paramMap = new Map(
         params.split(',').map((p) => {
           const [key, value] = p.split('=');
-          return [key, parseInt(value, 10)];
+          return [key, parseInt(value ?? '0', 10)];
         })
       );
 

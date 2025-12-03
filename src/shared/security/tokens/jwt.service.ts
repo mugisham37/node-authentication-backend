@@ -62,14 +62,18 @@ export class JwtService {
         sessionId,
       };
 
+      const issuer: string = env.JWT_ISSUER;
+      const audience: string = env.JWT_AUDIENCE;
+      const secret: string = env.JWT_SECRET;
+
       const options: SignOptions = {
         expiresIn: this.ACCESS_TOKEN_EXPIRY,
-        issuer: env.JWT_ISSUER || 'enterprise-auth-system',
-        audience: env.JWT_AUDIENCE || 'enterprise-auth-api',
+        issuer,
+        audience,
         algorithm: 'HS256',
       };
 
-      const token = jwt.sign(payload, env.JWT_SECRET, options);
+      const token = jwt.sign(payload, secret, options);
       logger.debug('Access token generated', { userId, sessionId });
 
       return token;
@@ -94,14 +98,18 @@ export class JwtService {
         sessionId,
       };
 
+      const issuer: string = env.JWT_ISSUER;
+      const audience: string = env.JWT_AUDIENCE;
+      const secret: string = env.JWT_REFRESH_TOKEN_SECRET;
+
       const options: SignOptions = {
         expiresIn: this.REFRESH_TOKEN_EXPIRY,
-        issuer: env.JWT_ISSUER || 'enterprise-auth-system',
-        audience: env.JWT_AUDIENCE || 'enterprise-auth-api',
+        issuer,
+        audience,
         algorithm: 'HS256',
       };
 
-      const token = jwt.sign(payload, env.JWT_REFRESH_SECRET || env.JWT_SECRET, options);
+      const token = jwt.sign(payload, secret, options);
       logger.debug('Refresh token generated', { userId, sessionId });
 
       return token;
@@ -151,13 +159,16 @@ export class JwtService {
         type: 'verification',
       };
 
+      const issuer: string = env.JWT_ISSUER;
+      const secret: string = env.JWT_SECRET;
+
       const options: SignOptions = {
         expiresIn: this.VERIFICATION_TOKEN_EXPIRY,
-        issuer: env.JWT_ISSUER || 'enterprise-auth-system',
+        issuer,
         algorithm: 'HS256',
       };
 
-      const token = jwt.sign(payload, env.JWT_SECRET, options);
+      const token = jwt.sign(payload, secret, options);
       logger.debug('Verification token generated', { userId, email });
 
       return token;
@@ -181,13 +192,16 @@ export class JwtService {
         type: 'reset',
       };
 
+      const issuer: string = env.JWT_ISSUER;
+      const secret: string = env.JWT_SECRET;
+
       const options: SignOptions = {
         expiresIn: this.RESET_TOKEN_EXPIRY,
-        issuer: env.JWT_ISSUER || 'enterprise-auth-system',
+        issuer,
         algorithm: 'HS256',
       };
 
-      const token = jwt.sign(payload, env.JWT_SECRET, options);
+      const token = jwt.sign(payload, secret, options);
       logger.debug('Reset token generated', { userId, email });
 
       return token;
@@ -204,13 +218,17 @@ export class JwtService {
    */
   static verifyAccessToken(token: string): JwtPayload {
     try {
+      const issuer: string = env.JWT_ISSUER;
+      const audience: string = env.JWT_AUDIENCE;
+      const secret: string = env.JWT_SECRET;
+
       const options: VerifyOptions = {
-        issuer: env.JWT_ISSUER || 'enterprise-auth-system',
-        audience: env.JWT_AUDIENCE || 'enterprise-auth-api',
+        issuer,
+        audience,
         algorithms: ['HS256'],
       };
 
-      const payload = jwt.verify(token, env.JWT_SECRET, options) as JwtPayload;
+      const payload = jwt.verify(token, secret, options) as JwtPayload;
 
       if (payload.type !== 'access') {
         throw new Error('Invalid token type');
@@ -231,17 +249,17 @@ export class JwtService {
    */
   static verifyRefreshToken(token: string): JwtPayload {
     try {
+      const issuer: string = env.JWT_ISSUER;
+      const audience: string = env.JWT_AUDIENCE;
+      const secret: string = env.JWT_REFRESH_TOKEN_SECRET;
+
       const options: VerifyOptions = {
-        issuer: env.JWT_ISSUER || 'enterprise-auth-system',
-        audience: env.JWT_AUDIENCE || 'enterprise-auth-api',
+        issuer,
+        audience,
         algorithms: ['HS256'],
       };
 
-      const payload = jwt.verify(
-        token,
-        env.JWT_REFRESH_SECRET || env.JWT_SECRET,
-        options
-      ) as JwtPayload;
+      const payload = jwt.verify(token, secret, options) as JwtPayload;
 
       if (payload.type !== 'refresh') {
         throw new Error('Invalid token type');
@@ -262,7 +280,8 @@ export class JwtService {
    */
   static verifyVerificationToken(token: string): JwtPayload {
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+      const secret: string = env.JWT_SECRET;
+      const payload = jwt.verify(token, secret) as JwtPayload;
 
       if (payload.type !== 'verification') {
         throw new Error('Invalid token type');
@@ -282,7 +301,8 @@ export class JwtService {
    */
   static verifyResetToken(token: string): JwtPayload {
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+      const secret: string = env.JWT_SECRET;
+      const payload = jwt.verify(token, secret) as JwtPayload;
 
       if (payload.type !== 'reset') {
         throw new Error('Invalid token type');
@@ -315,7 +335,9 @@ export class JwtService {
    */
   static isExpired(token: string): boolean {
     const payload = this.decode(token);
-    if (!payload || !payload.exp) return true;
+    if (!payload || !payload.exp) {
+      return true;
+    }
 
     return Date.now() >= payload.exp * 1000;
   }
