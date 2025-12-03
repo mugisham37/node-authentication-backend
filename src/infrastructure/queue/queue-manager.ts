@@ -73,9 +73,10 @@ export class QueueManager {
       this.isInitialized = true;
       logger.info('Queue manager initialized successfully');
     } catch (error) {
-      logger.error('Failed to initialize queue manager', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to initialize queue manager',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -102,9 +103,10 @@ export class QueueManager {
       this.isInitialized = false;
       logger.info('Queue manager shut down successfully');
     } catch (error) {
-      logger.error('Failed to shutdown queue manager', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to shutdown queue manager',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }

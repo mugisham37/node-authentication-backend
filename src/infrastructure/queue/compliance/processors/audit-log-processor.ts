@@ -44,62 +44,88 @@ export class AuditLogProcessor {
     });
 
     try {
-      // Parse IP address if provided
-      let ipAddress: IPAddress | null = null;
-      if (input.ipAddress) {
-        try {
-          ipAddress = new IPAddress(input.ipAddress);
-        } catch (error) {
-          logger.warn('Invalid IP address in audit log', {
-            ipAddress: input.ipAddress,
-            error: (error as Error).message,
-          });
-        }
-      }
-
-      // Calculate risk score (Requirement: 13.3)
-      const riskScore = AuditLog.calculateRiskScore(input.action, input.status, input.metadata);
-
-      // Create audit log entity
-      const auditLog = new AuditLog({
-        id: randomUUID(),
-        userId: input.userId,
-        action: input.action,
-        resource: input.resource,
-        resourceId: input.resourceId,
-        status: input.status,
-        ipAddress,
-        userAgent: input.userAgent,
-        metadata: input.metadata || {},
-        riskScore,
-        createdAt: new Date(),
-      });
-
-      // Save to database (Requirement: 13.1, 13.6)
-      await this.auditLogRepository.create(auditLog);
-
-      logger.info('Audit log created', {
-        id: auditLog.id,
-        action: auditLog.action,
-        userId: auditLog.userId,
-        status: auditLog.status,
-        riskScore: auditLog.riskScore,
-        riskLevel: auditLog.getRiskLevel(),
-      });
+      const auditLog = await this.createAuditLog(input);
+      await this.saveAuditLog(auditLog);
 
       // Generate security alert for high-risk events (Requirement: 13.4)
       if (auditLog.isHighRisk()) {
         this.generateSecurityAlert(auditLog);
       }
     } catch (error) {
-      logger.error('Failed to process audit log job', {
-        jobId: job.id,
-        action: input.action,
-        userId: input.userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to process audit log job',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          jobId: job.id,
+          action: input.action,
+          userId: input.userId,
+        }
+      );
       throw error; // Re-throw to trigger retry
     }
+  }
+
+  /**
+   * Create audit log entity from job data
+   * Requirement: 13.3
+   */
+  private async createAuditLog(input: AuditLogJobData): Promise<AuditLog> {
+    // Parse IP address if provided
+    const ipAddress = this.parseIPAddress(input.ipAddress);
+
+    // Calculate risk score (Requirement: 13.3)
+    const riskScore = AuditLog.calculateRiskScore(input.action, input.status, input.metadata);
+
+    // Create audit log entity
+    return new AuditLog({
+      id: randomUUID(),
+      userId: input.userId,
+      action: input.action,
+      resource: input.resource,
+      resourceId: input.resourceId,
+      status: input.status,
+      ipAddress,
+      userAgent: input.userAgent,
+      metadata: input.metadata || {},
+      riskScore,
+      createdAt: new Date(),
+    });
+  }
+
+  /**
+   * Parse IP address from string
+   */
+  private parseIPAddress(ipAddressStr?: string): IPAddress | null {
+    if (!ipAddressStr) {
+      return null;
+    }
+
+    try {
+      return new IPAddress(ipAddressStr);
+    } catch (error) {
+      logger.warn('Invalid IP address in audit log', {
+        ipAddress: ipAddressStr,
+        error: (error as Error).message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Save audit log to database
+   * Requirement: 13.1, 13.6
+   */
+  private async saveAuditLog(auditLog: AuditLog): Promise<void> {
+    await this.auditLogRepository.create(auditLog);
+
+    logger.info('Audit log created', {
+      id: auditLog.id,
+      action: auditLog.action,
+      userId: auditLog.userId,
+      status: auditLog.status,
+      riskScore: auditLog.riskScore,
+      riskLevel: auditLog.getRiskLevel(),
+    });
   }
 
   /**
@@ -141,10 +167,13 @@ export class AuditLogProcessor {
       // For now, just log the alert
       // In production, integrate with alerting services
     } catch (error) {
-      logger.error('Failed to generate security alert', {
-        auditLogId: auditLog.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to generate security alert',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          auditLogId: auditLog.id,
+        }
+      );
       // Don't throw - alert generation failure should not break audit logging
     }
   }

@@ -67,11 +67,14 @@ export class CleanupProcessor {
 
       return result;
     } catch (error) {
-      logger.error('Cleanup job processing failed', {
-        jobId: job.id,
-        jobType: name,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Cleanup job processing failed',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          jobId: job.id,
+          jobType: name,
+        }
+      );
       throw error;
     }
   }
@@ -120,9 +123,10 @@ export class CleanupProcessor {
         processedAt: new Date(),
       };
     } catch (error) {
-      logger.error('Failed to clean up expired sessions', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to clean up expired sessions',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -176,9 +180,10 @@ export class CleanupProcessor {
         processedAt: new Date(),
       };
     } catch (error) {
-      logger.error('Failed to clean up expired tokens', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to clean up expired tokens',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -212,9 +217,10 @@ export class CleanupProcessor {
         processedAt: new Date(),
       };
     } catch (error) {
-      logger.error('Failed to clean up unused devices', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to clean up unused devices',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }

@@ -102,12 +102,16 @@ export class AuditLogProcessor {
         this.generateSecurityAlert(auditLog);
       }
     } catch (error) {
-      logger.error('Failed to process audit log job', {
-        jobId: job.id,
-        action: input.action,
-        userId: input.userId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to process audit log job',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          jobId: job.id,
+          action: input.action,
+          userId: input.userId,
+        }
+      );
+      throw error;
       throw error;
     }
   }
@@ -154,10 +158,13 @@ export class AuditLogProcessor {
       // For now, just log the alert
       // In production, integrate with alerting services
     } catch (error) {
-      logger.error('Failed to generate security alert', {
-        auditLogId: auditLog.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to generate security alert',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          auditLogId: auditLog.id,
+        }
+      );
       // Don't throw - alert generation failure should not break audit logging
     }
   }

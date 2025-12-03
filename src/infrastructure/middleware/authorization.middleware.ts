@@ -73,8 +73,9 @@ export function requireAnyPermission(permissions: PermissionCheck[]) {
 
     if (!hasAnyPermission) {
       // Log authorization failure (Requirement: 13.2, 19.3)
-      if (permissions.length > 0) {
-        await logAuthorizationFailure(request, permissions[0]);
+      const firstPermission = permissions[0];
+      if (firstPermission) {
+        await logAuthorizationFailure(request, firstPermission);
       }
 
       throw new AuthorizationError('Insufficient permissions', {
@@ -114,8 +115,9 @@ export function requireAllPermissions(permissions: PermissionCheck[]) {
       const missingPermissions = permissions.filter((_, index) => !permissionChecks[index]);
 
       // Log authorization failure (Requirement: 13.2, 19.3)
-      if (missingPermissions.length > 0) {
-        await logAuthorizationFailure(request, missingPermissions[0]);
+      const firstMissing = missingPermissions[0];
+      if (firstMissing) {
+        await logAuthorizationFailure(request, firstMissing);
       }
 
       throw new AuthorizationError('Insufficient permissions', {

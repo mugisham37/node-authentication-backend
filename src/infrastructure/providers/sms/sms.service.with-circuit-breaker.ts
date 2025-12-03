@@ -27,7 +27,7 @@ export class SMSServiceWithCircuitBreaker implements ISMSService {
     return this.smsService.validatePhoneNumber(phoneNumber);
   }
 
-  getCircuitBreakerMetrics() {
+  getCircuitBreakerMetrics(): ReturnType<CircuitBreaker['getMetrics']> {
     return this.circuitBreaker.getMetrics();
   }
 }

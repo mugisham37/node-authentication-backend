@@ -60,11 +60,14 @@ export class SMSService implements ISMSService {
       }
     }
 
-    logger.error('Failed to send SMS after all retries', {
-      error: lastError,
-      to: input.to,
-      attempts: this.maxRetries,
-    });
+    logger.error(
+      'Failed to send SMS after all retries',
+      lastError || new Error('Failed to send SMS'),
+      {
+        to: input.to,
+        attempts: this.maxRetries,
+      }
+    );
 
     throw lastError || new Error('Failed to send SMS');
   }

@@ -59,11 +59,14 @@ export class AuditLogQueue {
       });
     } catch (error) {
       // Log error but don't throw - audit logging should not break main flow
-      logger.error('Failed to add audit log job to queue', {
-        error,
-        action: data.action,
-        userId: data.userId,
-      });
+      logger.error(
+        'Failed to add audit log job to queue',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          action: data.action,
+          userId: data.userId,
+        }
+      );
     }
   }
 
@@ -83,10 +86,11 @@ export class AuditLogQueue {
       );
     }
 
+    const processor = this.processor;
     this.worker = new Worker<AuditLogJobData>(
       'audit-logs',
       async (job: Job<AuditLogJobData>) => {
-        await this.processor!.process(job);
+        await processor.process(job);
       },
       {
         connection: this.connection,
@@ -99,10 +103,13 @@ export class AuditLogQueue {
     });
 
     this.worker.on('failed', (job, error) => {
-      logger.error('Audit log worker failed job', {
-        jobId: job?.id,
-        error,
-      });
+      logger.error(
+        'Audit log worker failed job',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          jobId: job?.id,
+        }
+      );
     });
 
     logger.info('Audit log worker started');

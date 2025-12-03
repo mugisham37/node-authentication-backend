@@ -103,9 +103,10 @@ export class CleanupQueue {
 
       logger.info('All cleanup jobs scheduled successfully');
     } catch (error) {
-      logger.error('Failed to schedule cleanup jobs', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.error(
+        'Failed to schedule cleanup jobs',
+        error instanceof Error ? error : new Error(String(error))
+      );
       throw error;
     }
   }
@@ -168,11 +169,14 @@ export class CleanupQueue {
     });
 
     this.worker.on('failed', (job, error) => {
-      logger.error('Cleanup worker failed job', {
-        jobId: job?.id,
-        jobType: job?.name,
-        error,
-      });
+      logger.error(
+        'Cleanup worker failed job',
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          jobId: job?.id,
+          jobType: job?.name,
+        }
+      );
     });
 
     logger.info('Cleanup worker started');
