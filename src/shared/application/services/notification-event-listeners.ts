@@ -1,4 +1,4 @@
-import { domainEventEmitter } from '../../../domain/events/event-emitter.js';
+import { domainEventEmitter } from '../../domain/events/event-emitter.js';
 import { DeviceRegisteredEvent } from '../../domain/events/device-events.js';
 import { PasswordChangedEvent } from '../../domain/events/user-events.js';
 import { MFAEnabledEvent, MFADisabledEvent } from '../../domain/events/mfa-events.js';

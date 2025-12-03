@@ -3,8 +3,8 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   IWebhookRepository,
   WebhookDelivery,
-} from '../../domain/repositories/webhook.repository.js';
-import { Webhook } from '../../domain/entities/webhook.entity.js';
+} from '../../shared/domain/repositories/webhook.repository.js';
+import { Webhook } from '../../shared/domain/entities/webhook.entity.js';
 import { webhooks, webhookDeliveries } from '../../core/database/schema/webhooks.schema.js';
 import {
   NotFoundError,
