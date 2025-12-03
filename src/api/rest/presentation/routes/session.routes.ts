@@ -1,16 +1,20 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../core/container/container.js';
-import { ISessionService } from '../../application/services/session.service.js';
+import { container } from '../../../../infrastructure/container/container.js';
+import { ISessionService } from '../../../../application/services/session.service.js';
 import {
   authenticationMiddleware,
   AuthenticatedRequest,
-} from '../middleware/authentication.middleware.js';
-import { validateRequest, idParamSchema } from '../middleware/validation.middleware.js';
+} from '../../../../infrastructure/middleware/authentication.middleware.js';
+import {
+  validateRequest,
+  idParamSchema,
+} from '../../../../infrastructure/middleware/validation.middleware.js';
 
 /**
  * Register session management routes
  */
-export async function sessionRoutes(app: FastifyInstance): Promise<void> {
+// eslint-disable-next-line max-lines-per-function
+export function sessionRoutes(app: FastifyInstance): void {
   const sessionService = container.resolve<ISessionService>('sessionService');
 
   /**
@@ -25,10 +29,10 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const authRequest = request as AuthenticatedRequest;
 
-      const sessions = await sessionService.getUserSessions(authRequest.user.userId);
+      const result = await sessionService.listUserSessions(authRequest.user.userId);
 
       return reply.status(200).send({
-        sessions: sessions.map((session) => ({
+        sessions: result.sessions.map((session) => ({
           id: session.id,
           deviceName: session.deviceName,
           ipAddress: session.ipAddress,
@@ -39,6 +43,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
           createdAt: session.createdAt,
           isCurrent: session.id === authRequest.user.sessionId,
         })),
+        total: result.total,
       });
     }
   );
@@ -56,7 +61,7 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       const authRequest = request as AuthenticatedRequest;
       const { id } = request.params as { id: string };
 
-      await sessionService.revokeSession(authRequest.user.userId, id);
+      await sessionService.revokeSession(id, authRequest.user.userId);
 
       return reply.status(200).send({
         message: 'Session revoked successfully',
@@ -77,7 +82,19 @@ export async function sessionRoutes(app: FastifyInstance): Promise<void> {
       const authRequest = request as AuthenticatedRequest;
       const currentSessionId = authRequest.user.sessionId;
 
-      await sessionService.revokeAllSessionsExcept(authRequest.user.userId, currentSessionId);
+      if (!currentSessionId) {
+        return reply.status(400).send({
+          error: {
+            type: 'ValidationError',
+            message: 'Current session ID not found',
+          },
+        });
+      }
+
+      await sessionService.revokeAllSessionsExceptCurrent(
+        authRequest.user.userId,
+        currentSessionId
+      );
 
       return reply.status(200).send({
         message: 'All other sessions revoked successfully',

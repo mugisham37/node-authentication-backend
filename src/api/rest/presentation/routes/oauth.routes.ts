@@ -168,6 +168,7 @@ async function unlinkOAuthAccount(
 /**
  * Register OAuth routes
  */
+// eslint-disable-next-line max-lines-per-function
 export function oauthRoutes(app: FastifyInstance): void {
   const oauthService = container.resolve<IOAuthService>('oauthService');
 

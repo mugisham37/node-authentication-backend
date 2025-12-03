@@ -1,20 +1,21 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../core/container/container.js';
-import { IUserService } from '../../application/services/user.service.js';
+import { container } from '../../../../infrastructure/container/container.js';
+import { IUserService } from '../../../../application/services/user.service.js';
 import {
   authenticationMiddleware,
   AuthenticatedRequest,
-} from '../middleware/authentication.middleware.js';
+} from '../../../../infrastructure/middleware/authentication.middleware.js';
 import {
   validateRequest,
   updateProfileBodySchema,
   changePasswordBodySchema,
-} from '../middleware/validation.middleware.js';
+} from '../../../../infrastructure/middleware/validation.middleware.js';
 
 /**
  * Register user management routes
  */
-export async function userRoutes(app: FastifyInstance): Promise<void> {
+// eslint-disable-next-line max-lines-per-function
+export function userRoutes(app: FastifyInstance): void {
   const userService = container.resolve<IUserService>('userService');
 
   /**

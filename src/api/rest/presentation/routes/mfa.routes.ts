@@ -1,22 +1,23 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../core/container/container.js';
-import { IMFAService } from '../../application/services/mfa.service.js';
+import { container } from '../../../../infrastructure/container/container.js';
+import { IMFAService } from '../../../../application/services/mfa.service.js';
 import {
   validateRequest,
   setupMfaBodySchema,
   verifyMfaBodySchema,
   disableMfaBodySchema,
-} from '../middleware/validation.middleware.js';
+} from '../../../../infrastructure/middleware/validation.middleware.js';
 import {
   authenticationMiddleware,
   AuthenticatedRequest,
-} from '../middleware/authentication.middleware.js';
-import { mfaVerificationRateLimiter } from '../middleware/rate-limit.middleware.js';
+} from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { mfaVerificationRateLimiter } from '../../../../infrastructure/middleware/rate-limit.middleware.js';
 
 /**
  * Register MFA routes
  */
-export async function mfaRoutes(app: FastifyInstance): Promise<void> {
+// eslint-disable-next-line max-lines-per-function
+export function mfaRoutes(app: FastifyInstance): void {
   const mfaService = container.resolve<IMFAService>('mfaService');
 
   /**
@@ -36,12 +37,13 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
       };
 
       if (type === 'totp') {
-        const result = await mfaService.setupTOTP(authRequest.user.userId);
+        const result = await mfaService.setupTOTP({ userId: authRequest.user.userId });
 
         return reply.status(200).send({
           type: 'totp',
           secret: result.secret,
-          qrCode: result.qrCode,
+          qrCodeUrl: result.qrCodeUrl,
+          backupCodes: result.backupCodes,
           message: 'Scan the QR code with your authenticator app and verify with a code',
         });
       } else {
@@ -54,7 +56,7 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
           });
         }
 
-        await mfaService.setupSMS(authRequest.user.userId, phoneNumber);
+        await mfaService.setupSMS({ userId: authRequest.user.userId, phoneNumber });
 
         return reply.status(200).send({
           type: 'sms',
@@ -80,7 +82,18 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
         code: string;
       };
 
-      const result = await mfaService.verifyMFA(challengeId, code);
+      // Extract device information from request
+      const deviceName = request.headers['user-agent'] || 'Unknown Device';
+      const ipAddress = request.ip || '127.0.0.1';
+      const userAgent = request.headers['user-agent'] || 'Unknown';
+
+      const result = await mfaService.verifyMFALogin({
+        challengeId,
+        code,
+        deviceName,
+        ipAddress,
+        userAgent,
+      });
 
       return reply.status(200).send({
         user: {
@@ -91,12 +104,9 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
           emailVerified: result.user.emailVerified,
           mfaEnabled: result.user.mfaEnabled,
         },
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
         session: {
           id: result.session.id,
-          deviceName: result.session.deviceName,
-          trustScore: result.session.trustScore,
+          expiresAt: result.session.expiresAt,
         },
       });
     }
@@ -115,7 +125,11 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
       const authRequest = request as AuthenticatedRequest;
       const { code } = request.body as { code: string };
 
-      await mfaService.disableMFA(authRequest.user.userId, code);
+      await mfaService.disableMFA({
+        userId: authRequest.user.userId,
+        code,
+        lastAuthTime: new Date(), // Current time as they're authenticated
+      });
 
       return reply.status(200).send({
         message: 'MFA disabled successfully',
@@ -125,20 +139,21 @@ export async function mfaRoutes(app: FastifyInstance): Promise<void> {
 
   /**
    * GET /api/v1/auth/mfa/backup-codes
-   * Get backup codes
+   * Get backup codes (returned during setup only)
+   * Note: Backup codes are only provided during MFA setup for security reasons
    */
   app.get(
     '/api/v1/auth/mfa/backup-codes',
     {
       preHandler: [authenticationMiddleware],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const authRequest = request as AuthenticatedRequest;
-
-      const backupCodes = await mfaService.getBackupCodes(authRequest.user.userId);
-
-      return reply.status(200).send({
-        backupCodes,
+    async (_request: FastifyRequest, reply: FastifyReply) => {
+      return reply.status(400).send({
+        error: {
+          type: 'ValidationError',
+          message:
+            'Backup codes are only provided during MFA setup. Please disable and re-enable MFA to generate new codes.',
+        },
       });
     }
   );

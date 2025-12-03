@@ -1,0 +1,22 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "TOTP",
+    "totp",
+    "IMFA",
+    "passwordless",
+    "Passwordless",
+    "PKCE",
+    "pkce",
+    "Pkce",
+    "webauthn",
+    "unsubscription"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "*.log",
+    "package-lock.json"
+  ]
+}

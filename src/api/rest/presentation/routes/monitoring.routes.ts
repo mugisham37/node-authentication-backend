@@ -4,12 +4,12 @@ import { register as promRegister } from 'prom-client';
 /**
  * Register monitoring routes
  */
-export async function monitoringRoutes(app: FastifyInstance): Promise<void> {
+export function monitoringRoutes(app: FastifyInstance): void {
   /**
    * GET /api/v1/health
    * Health check endpoint
    */
-  app.get('/api/v1/health', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/api/v1/health', async (_request: FastifyRequest, reply: FastifyReply) => {
     // Check database connectivity
     let dbHealthy = true;
     try {
@@ -39,7 +39,7 @@ export async function monitoringRoutes(app: FastifyInstance): Promise<void> {
         database: dbHealthy ? 'healthy' : 'unhealthy',
         redis: redisHealthy ? 'healthy' : 'unhealthy',
       },
-      version: process.env.npm_package_version || '1.0.0',
+      version: process.env['npm_package_version'] || '1.0.0',
     });
   });
 
@@ -47,7 +47,7 @@ export async function monitoringRoutes(app: FastifyInstance): Promise<void> {
    * GET /api/v1/metrics
    * Prometheus metrics endpoint
    */
-  app.get('/api/v1/metrics', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/api/v1/metrics', async (_request: FastifyRequest, reply: FastifyReply) => {
     const metrics = await promRegister.metrics();
 
     return reply.header('Content-Type', promRegister.contentType).status(200).send(metrics);
