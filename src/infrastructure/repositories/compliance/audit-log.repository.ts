@@ -1,9 +1,11 @@
-import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   IAuditLogRepository,
   AuditLogFilters,
+  AuditLogPaginationOptions,
+  PaginatedAuditLogs,
 } from '../../../domain/repositories/audit-log.repository.js';
 import { AuditLog } from '../../../domain/entities/audit-log.entity.js';
 import { IPAddress } from '../../../domain/value-objects/ip-address.value-object.js';
@@ -270,6 +272,89 @@ export class AuditLogRepository implements IAuditLogRepository {
       throw new ServiceUnavailableError('Database', {
         originalError: errorMessage,
         operation: 'findRecentByUserId',
+      });
+    }
+  }
+
+  /**
+   * Find audit logs with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  async findPaginated(options: AuditLogPaginationOptions): Promise<PaginatedAuditLogs> {
+    try {
+      // Build WHERE conditions
+      const conditions: SQL[] = [];
+
+      if (options.userId) {
+        conditions.push(eq(auditLogs.userId, options.userId));
+      }
+
+      if (options.action) {
+        conditions.push(eq(auditLogs.action, options.action));
+      }
+
+      if (options.resource) {
+        conditions.push(eq(auditLogs.resource, options.resource));
+      }
+
+      if (options.status) {
+        conditions.push(eq(auditLogs.status, options.status));
+      }
+
+      if (options.minRiskScore !== undefined) {
+        conditions.push(gte(auditLogs.riskScore, options.minRiskScore));
+      }
+
+      if (options.maxRiskScore !== undefined) {
+        conditions.push(lte(auditLogs.riskScore, options.maxRiskScore));
+      }
+
+      if (options.startDate) {
+        conditions.push(gte(auditLogs.createdAt, options.startDate));
+      }
+
+      if (options.endDate) {
+        conditions.push(lte(auditLogs.createdAt, options.endDate));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const countResult = await this.db
+        .select({ count: count() })
+        .from(auditLogs)
+        .where(whereClause);
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get paginated results
+      const sortColumn =
+        options.sortBy === 'action'
+          ? auditLogs.action
+          : options.sortBy === 'riskScore'
+            ? auditLogs.riskScore
+            : auditLogs.createdAt;
+      const sortDirection = options.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+      const result = await this.db
+        .select()
+        .from(auditLogs)
+        .where(whereClause)
+        .orderBy(sortDirection)
+        .limit(options.limit)
+        .offset(options.offset);
+
+      const auditLogEntities = result.map((row) => this.mapToEntity(row));
+
+      return {
+        auditLogs: auditLogEntities,
+        total: Number(total),
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new ServiceUnavailableError('Database', {
+        originalError: errorMessage,
+        operation: 'findPaginated',
       });
     }
   }

@@ -18,6 +18,32 @@ export interface AuditLogFilters {
 }
 
 /**
+ * Pagination options for audit log queries
+ */
+export interface AuditLogPaginationOptions {
+  offset: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  userId?: string;
+  action?: string;
+  resource?: string;
+  status?: 'success' | 'failure' | 'pending';
+  minRiskScore?: number;
+  maxRiskScore?: number;
+  startDate?: Date;
+  endDate?: Date;
+}
+
+/**
+ * Paginated audit log result
+ */
+export interface PaginatedAuditLogs {
+  auditLogs: AuditLog[];
+  total: number;
+}
+
+/**
  * Audit Log Repository Interface
  * Requirements: 13.1, 13.5, 13.6
  */
@@ -44,6 +70,12 @@ export interface IAuditLogRepository {
    * Requirement: 13.5
    */
   count(filters: AuditLogFilters): Promise<number>;
+
+  /**
+   * Find audit logs with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  findPaginated(options: AuditLogPaginationOptions): Promise<PaginatedAuditLogs>;
 
   /**
    * Find high-risk audit logs

@@ -18,6 +18,26 @@ export interface WebhookDelivery {
 }
 
 /**
+ * Pagination options for webhook queries
+ */
+export interface WebhookPaginationOptions {
+  offset: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  userId?: string;
+  isActive?: boolean;
+}
+
+/**
+ * Paginated webhook result
+ */
+export interface PaginatedWebhooks {
+  webhooks: Webhook[];
+  total: number;
+}
+
+/**
  * Webhook Repository Interface
  * Requirements: 16.1, 16.5, 16.6
  */
@@ -38,6 +58,12 @@ export interface IWebhookRepository {
    * Requirement: 16.5
    */
   findByUserId(userId: string): Promise<Webhook[]>;
+
+  /**
+   * Find webhooks with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  findPaginated(options: WebhookPaginationOptions): Promise<PaginatedWebhooks>;
 
   /**
    * Find active webhooks subscribed to an event

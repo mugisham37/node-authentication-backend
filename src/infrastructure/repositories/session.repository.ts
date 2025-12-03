@@ -1,4 +1,8 @@
-import { ISessionRepository } from '../../domain/repositories/session.repository.js';
+import {
+  ISessionRepository,
+  SessionPaginationOptions,
+  PaginatedSessions,
+} from '../../domain/repositories/session.repository.js';
 import { Session } from '../../domain/entities/session.entity.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
@@ -242,6 +246,71 @@ export class SessionRepository implements ISessionRepository {
       throw new ServiceUnavailableError('Redis', {
         originalError: (error as Error).message,
         operation: 'findAll',
+      });
+    }
+  }
+
+  /**
+   * Find sessions with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  async findPaginated(options: SessionPaginationOptions): Promise<PaginatedSessions> {
+    try {
+      let sessions: Session[];
+
+      // If filtering by userId, use the user's session set
+      if (options.userId) {
+        sessions = await this.findByUserId(options.userId);
+      } else {
+        // Otherwise, get all sessions
+        sessions = await this.findAll();
+      }
+
+      // Filter by active status
+      if (options.isActive !== undefined) {
+        sessions = sessions.filter((session) => {
+          const isActive = !session.isRevoked() && !session.isExpired();
+          return options.isActive ? isActive : !isActive;
+        });
+      }
+
+      // Sort sessions
+      const sortBy = options.sortBy || 'createdAt';
+      sessions.sort((a, b) => {
+        let aValue: Date | number | string;
+        let bValue: Date | number | string;
+
+        if (sortBy === 'lastActivityAt') {
+          aValue = a.lastActivityAt;
+          bValue = b.lastActivityAt;
+        } else if (sortBy === 'trustScore') {
+          aValue = a.trustScore;
+          bValue = b.trustScore;
+        } else {
+          aValue = a.createdAt;
+          bValue = b.createdAt;
+        }
+
+        if (options.sortOrder === 'asc') {
+          return aValue > bValue ? 1 : -1;
+        } else {
+          return aValue < bValue ? 1 : -1;
+        }
+      });
+
+      const total = sessions.length;
+
+      // Apply pagination
+      const paginatedSessions = sessions.slice(options.offset, options.offset + options.limit);
+
+      return {
+        sessions: paginatedSessions,
+        total,
+      };
+    } catch (error) {
+      throw new ServiceUnavailableError('Redis', {
+        originalError: (error as Error).message,
+        operation: 'findPaginated',
       });
     }
   }

@@ -1,6 +1,26 @@
 import { Device } from '../entities/device.entity.js';
 
 /**
+ * Pagination options for device queries
+ */
+export interface DevicePaginationOptions {
+  offset: number;
+  limit: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  userId?: string;
+  isTrusted?: boolean;
+}
+
+/**
+ * Paginated device result
+ */
+export interface PaginatedDevices {
+  devices: Device[];
+  total: number;
+}
+
+/**
  * Device Repository Interface
  * Requirements: 15.1, 15.2, 15.4, 15.6
  */
@@ -27,6 +47,12 @@ export interface IDeviceRepository {
    * Requirement: 15.2
    */
   findByUserId(userId: string): Promise<Device[]>;
+
+  /**
+   * Find devices with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  findPaginated(options: DevicePaginationOptions): Promise<PaginatedDevices>;
 
   /**
    * Update device

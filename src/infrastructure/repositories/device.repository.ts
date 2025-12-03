@@ -1,6 +1,10 @@
-import { eq, lt } from 'drizzle-orm';
+import { eq, lt, count, desc, asc } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { IDeviceRepository } from '../../domain/repositories/device.repository.js';
+import {
+  IDeviceRepository,
+  DevicePaginationOptions,
+  PaginatedDevices,
+} from '../../domain/repositories/device.repository.js';
 import { Device } from '../../domain/entities/device.entity.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
 import { devices, type Device as DeviceRow } from '../database/schema/devices.schema.js';
@@ -254,6 +258,64 @@ export class DeviceRepository implements IDeviceRepository {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
         operation: 'deleteUnusedDevices',
+      });
+    }
+  }
+
+  /**
+   * Find devices with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  async findPaginated(options: DevicePaginationOptions): Promise<PaginatedDevices> {
+    try {
+      // Build where conditions
+      const conditions = [];
+
+      if (options.userId) {
+        conditions.push(eq(devices.userId, options.userId));
+      }
+
+      if (options.isTrusted !== undefined) {
+        conditions.push(eq(devices.isTrusted, options.isTrusted));
+      }
+
+      const whereClause = conditions.length > 0 ? eq(devices.userId, options.userId!) : undefined;
+
+      // Get total count
+      const countResult = await this.db
+        .select({ count: count() })
+        .from(devices)
+        .where(whereClause);
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get paginated results
+      const sortColumn =
+        options.sortBy === 'name'
+          ? devices.deviceName
+          : options.sortBy === 'lastSeenAt'
+            ? devices.lastSeenAt
+            : devices.createdAt;
+      const sortDirection = options.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+      const result = await this.db
+        .select()
+        .from(devices)
+        .where(whereClause)
+        .orderBy(sortDirection)
+        .limit(options.limit)
+        .offset(options.offset);
+
+      const deviceEntities = result.map((row) => this.mapToEntity(row));
+
+      return {
+        devices: deviceEntities,
+        total: Number(total),
+      };
+    } catch (error) {
+      throw new ServiceUnavailableError('Database', {
+        originalError: (error as Error).message,
+        operation: 'findPaginated',
       });
     }
   }

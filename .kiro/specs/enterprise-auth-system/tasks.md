@@ -1373,7 +1373,8 @@
   - Implement cursor encoding/decoding methods
   - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6_
 
-- [-] 25.9 Add pagination to repositories
+- [x] 25.9 Add pagination to repositories
+
 
   - Update UserRepository with findPaginated method
   - Update AuditLogRepository with findPaginated method
@@ -1407,7 +1408,8 @@
   - Update WebhookController to use WebhookSerializer
   - _Requirements: 24.1, 24.2, 24.3, 24.4, 24.5, 24.6_
 
-- [-] 25.12 Update routes to use controllers
+- [x] 25.12 Update routes to use controllers
+
 
   - Update auth.routes.ts to use AuthController
   - Update mfa.routes.ts to use MFAController

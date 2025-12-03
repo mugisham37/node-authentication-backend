@@ -2,7 +2,6 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { BaseController } from './base.controller.js';
 import { ISessionService } from '../../../../application/services/session.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
-import { SessionSerializer } from '../../../common/serializers/session.serializer.js';
 
 /**
  * Session controller handling session management operations
@@ -22,7 +21,7 @@ export class SessionController extends BaseController {
 
     return this.success(reply, {
       sessions: result.sessions.map((session) => ({
-        ...SessionSerializer.toDTO(session),
+        ...session,
         isCurrent: session.id === authRequest.user.sessionId,
       })),
       total: result.total,

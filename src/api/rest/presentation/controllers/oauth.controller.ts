@@ -5,9 +5,7 @@ import {
   GenerateAuthUrlInput,
   HandleCallbackInput,
 } from '../../../../application/services/oauth.service.js';
-import { OAuthAccount } from '../../../../domain/entities/oauth-account.entity.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
-import { UserSerializer } from '../../../common/serializers/user.serializer.js';
 import { OAuthAccountSerializer } from '../../../common/serializers/oauth-account.serializer.js';
 
 /**
@@ -109,11 +107,7 @@ export class OAuthController extends BaseController {
 
     const result = await this.oauthService.handleCallback(input);
 
-    return this.success(reply, {
-      user: UserSerializer.toPublic(result.user),
-      isNewUser: result.isNewUser,
-      oauthAccount: OAuthAccountSerializer.toDTO(result.oauthAccount),
-    });
+    return this.success(reply, result);
   }
 
   /**

@@ -2,7 +2,6 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { BaseController } from './base.controller.js';
 import { IDeviceService } from '../../../../application/services/device.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
-import { DeviceSerializer } from '../../../common/serializers/device.serializer.js';
 
 /**
  * Device controller handling device management operations
@@ -21,7 +20,7 @@ export class DeviceController extends BaseController {
     const devices = await this.deviceService.listDevices(authRequest.user.userId);
 
     return this.success(reply, {
-      devices: DeviceSerializer.toDTOList(devices),
+      devices,
     });
   }
 

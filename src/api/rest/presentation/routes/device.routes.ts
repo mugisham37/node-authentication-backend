@@ -1,10 +1,8 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { container } from '../../../../infrastructure/container/container.js';
 import { IDeviceService } from '../../../../application/services/device.service.js';
-import {
-  authenticationMiddleware,
-  AuthenticatedRequest,
-} from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { DeviceController } from '../controllers/device.controller.js';
+import { authenticationMiddleware } from '../../../../infrastructure/middleware/authentication.middleware.js';
 import {
   validateRequest,
   idParamSchema,
@@ -13,9 +11,9 @@ import {
 /**
  * Register device management routes
  */
-/* eslint-disable max-lines-per-function, @typescript-eslint/require-await */
 export async function deviceRoutes(app: FastifyInstance): Promise<void> {
   const deviceService = container.resolve<IDeviceService>('deviceService');
+  const deviceController = new DeviceController(deviceService);
 
   /**
    * GET /api/v1/devices
@@ -26,24 +24,7 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
     {
       preHandler: [authenticationMiddleware],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const authRequest = request as AuthenticatedRequest;
-
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-      const devices = await deviceService.listDevices(authRequest.user.userId);
-
-      return reply.status(200).send({
-        devices: devices.map((device) => ({
-          id: device.id,
-          name: device.name,
-          type: device.type,
-          isTrusted: device.isTrusted,
-          lastSeenAt: device.lastSeenAt,
-          createdAt: device.createdAt,
-        })),
-      });
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-    }
+    async (request, reply) => deviceController.listDevices(request, reply)
   );
 
   /**
@@ -55,17 +36,7 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
     {
       preHandler: [authenticationMiddleware, validateRequest({ params: idParamSchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const authRequest = request as AuthenticatedRequest;
-      const { id } = request.params as { id: string };
-
-      /* eslint-disable-next-line @typescript-eslint/no-unsafe-call */
-      await deviceService.markDeviceAsTrusted(authRequest.user.userId, id);
-
-      return reply.status(200).send({
-        message: 'Device marked as trusted',
-      });
-    }
+    async (request, reply) => deviceController.trustDevice(request, reply)
   );
 
   /**
@@ -77,16 +48,6 @@ export async function deviceRoutes(app: FastifyInstance): Promise<void> {
     {
       preHandler: [authenticationMiddleware, validateRequest({ params: idParamSchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const authRequest = request as AuthenticatedRequest;
-      const { id } = request.params as { id: string };
-
-      await deviceService.removeDevice(authRequest.user.userId, id);
-
-      return reply.status(200).send({
-        message: 'Device removed successfully',
-      });
-    }
+    async (request, reply) => deviceController.removeDevice(request, reply)
   );
 }
-/* eslint-enable max-lines-per-function, @typescript-eslint/require-await */

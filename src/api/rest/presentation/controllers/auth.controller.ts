@@ -6,7 +6,6 @@ import {
   LoginOutput,
 } from '../../../../application/services/authentication.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
-import { UserSerializer } from '../../../common/serializers/user.serializer.js';
 
 /**
  * Authentication controller handling user registration, login, logout, and password management
@@ -34,11 +33,7 @@ export class AuthController extends BaseController {
       image,
     });
 
-    return this.created(reply, {
-      user: UserSerializer.toPublic(result.user),
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-    });
+    return this.created(reply, result);
   }
 
   /**
@@ -76,15 +71,11 @@ export class AuthController extends BaseController {
    * Build login response with user and session data
    */
   private buildLoginResponse(reply: FastifyReply, result: LoginOutput): FastifyReply {
-    const response: {
-      user: ReturnType<typeof UserSerializer.toPublic>;
-      accessToken: string;
-      refreshToken: string;
-      session?: { id: string; deviceName: string; trustScore: number };
-    } = {
-      user: UserSerializer.toPublic(result.user),
+    const response = {
+      user: result.user,
       accessToken: result.accessToken || '',
       refreshToken: result.refreshToken || '',
+      session: undefined as { id: string; deviceName: string; trustScore: number } | undefined,
     };
 
     if (result.session) {

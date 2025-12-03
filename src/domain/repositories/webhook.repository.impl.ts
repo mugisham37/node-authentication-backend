@@ -1,6 +1,11 @@
-import { eq, and, desc, lte, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, lte, sql, count } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { IWebhookRepository, WebhookDelivery } from './webhook.repository.interface.js';
+import {
+  IWebhookRepository,
+  WebhookDelivery,
+  WebhookPaginationOptions,
+  PaginatedWebhooks,
+} from './webhook.repository.interface.js';
 import { Webhook } from '../entities/webhook.entity.js';
 import {
   webhooks,
@@ -103,6 +108,59 @@ export class WebhookRepository implements IWebhookRepository {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
         operation: 'findByUserId',
+      });
+    }
+  }
+
+  /**
+   * Find webhooks with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  async findPaginated(options: WebhookPaginationOptions): Promise<PaginatedWebhooks> {
+    try {
+      // Build where conditions
+      const conditions = [];
+
+      if (options.userId) {
+        conditions.push(eq(webhooks.userId, options.userId));
+      }
+
+      if (options.isActive !== undefined) {
+        conditions.push(eq(webhooks.isActive, options.isActive));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const countResult = await this.db
+        .select({ count: count() })
+        .from(webhooks)
+        .where(whereClause);
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get paginated results
+      const sortColumn = options.sortBy === 'url' ? webhooks.url : webhooks.createdAt;
+      const sortDirection = options.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+      const result = await this.db
+        .select()
+        .from(webhooks)
+        .where(whereClause)
+        .orderBy(sortDirection)
+        .limit(options.limit)
+        .offset(options.offset);
+
+      const webhookEntities = result.map((row) => this.mapToEntity(row));
+
+      return {
+        webhooks: webhookEntities,
+        total: Number(total),
+      };
+    } catch (error) {
+      throw new ServiceUnavailableError('Database', {
+        originalError: (error as Error).message,
+        operation: 'findPaginated',
       });
     }
   }
