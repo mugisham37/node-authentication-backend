@@ -3,7 +3,7 @@ import type {
   IRateLimitService,
   RateLimitConfig,
   RateLimitResult,
-} from '../../application/services/rate-limit.service.js';
+} from '../../shared/application/services/rate-limit.service.js';
 import { logger } from '../../core/logging/logger.js';
 
 /**

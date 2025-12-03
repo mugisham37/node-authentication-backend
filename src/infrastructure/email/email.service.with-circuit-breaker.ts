@@ -5,7 +5,7 @@ import type {
   PasswordResetEmailInput,
   SecurityAlertEmailInput,
   WelcomeEmailInput,
-} from '../../application/services/email.service.js';
+} from '../../shared/application/services/email.service.js';
 import { CircuitBreaker } from '../../core/resilience/circuit-breaker.js';
 import { logger } from '../../core/logging/logger.js';
 

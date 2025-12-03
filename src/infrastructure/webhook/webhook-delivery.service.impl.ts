@@ -3,7 +3,7 @@ import type {
   IWebhookDeliveryService,
   WebhookEvent,
   WebhookDeliveryResult,
-} from '../../application/services/webhook-delivery.service.js';
+} from '../../shared/application/services/webhook-delivery.service.js';
 import { WebhookQueue } from '../../core/queue/webhook-queue.js';
 import { logger } from '../../core/logging/logger.js';
 

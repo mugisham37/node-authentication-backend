@@ -10,7 +10,7 @@ import {
   WelcomeEmailJobData,
 } from './jobs/email-jobs.js';
 import { EmailProcessor } from './processors/email-processor.js';
-import type { IEmailService } from '../../application/services/email.service.js';
+import type { IEmailService } from '../../shared/application/services/email.service.js';
 
 export type EmailJobData =
   | EmailVerificationJobData

@@ -2,7 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { env } from '../../config/env.js';
 import { RateLimitError } from '../../core/errors/types/application-error.js';
 import { container } from '../../core/container/container.js';
-import { IRateLimitService } from '../../application/services/rate-limit.service.js';
+import { IRateLimitService } from '../application/services/rate-limit.service.js';
 import { AuthenticatedRequest } from './authentication.middleware.js';
 
 export interface RateLimitConfig {

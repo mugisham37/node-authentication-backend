@@ -1,11 +1,11 @@
-import { domainEventEmitter } from '../../domain/events/event-emitter.js';
+import { domainEventEmitter } from '../../../domain/events/event-emitter.js';
 import { DeviceRegisteredEvent } from '../../domain/events/device-events.js';
 import { PasswordChangedEvent } from '../../domain/events/user-events.js';
 import { MFAEnabledEvent, MFADisabledEvent } from '../../domain/events/mfa-events.js';
 import { SessionRevokedEvent, SessionCreatedEvent } from '../../domain/events/session-events.js';
 import { AccountLockedEvent, AccountUnlockedEvent } from '../../domain/events/user-events.js';
 import { notificationService } from './notification.service.js';
-import { logger } from '../../core/logging/logger.js';
+import { logger } from '../../../core/logging/logger.js';
 
 /**
  * Sets up event listeners for domain events to trigger real-time notifications
