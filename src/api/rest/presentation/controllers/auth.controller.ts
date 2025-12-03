@@ -76,6 +76,13 @@ export class AuthController extends BaseController {
       });
     }
 
+    return this.buildLoginResponse(reply, result);
+  }
+
+  /**
+   * Build login response with user and session data
+   */
+  private buildLoginResponse(reply: FastifyReply, result: LoginOutput): FastifyReply {
     const responseUser = {
       id: result.user.id,
       email: result.user.email,
@@ -89,11 +96,7 @@ export class AuthController extends BaseController {
       user: typeof responseUser;
       accessToken: string;
       refreshToken: string;
-      session?: {
-        id: string;
-        deviceName: string;
-        trustScore: number;
-      };
+      session?: { id: string; deviceName: string; trustScore: number };
     } = {
       user: responseUser,
       accessToken: result.accessToken || '',

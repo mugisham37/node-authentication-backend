@@ -1374,7 +1374,8 @@
   - Update WebhookRepository with findPaginated method
   - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6_
 
-- [ ] 25.10 Implement serializer layer
+- [x] 25.10 Implement serializer layer
+
   - Create base serializer utilities
   - Create UserSerializer with toPublic, toAdmin, toProfile methods
   - Create SessionSerializer with toDTO method
