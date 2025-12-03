@@ -62,7 +62,7 @@ export {
   type RegisterWebAuthnCredentialOutput,
   type AuthenticateWithWebAuthnInput,
   type AuthenticateWithWebAuthnOutput,
-} from './passwordless.service.js';
+} from '../modules/passwordless/application/services/passwordless.service.js';
 
 export { AuthorizationService, type IAuthorizationService } from './authorization.service.js';
 
