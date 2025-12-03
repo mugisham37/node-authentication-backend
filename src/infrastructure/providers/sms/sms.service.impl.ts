@@ -1,6 +1,6 @@
 import { Twilio } from 'twilio';
-import type { ISMSService, SendSMSInput } from '../../application/services/sms.service.js';
-import { logger } from '../../core/logging/logger.js';
+import type { ISMSService, SendSMSInput } from '../../../application/services/sms.service.js';
+import { log as logger } from '../../logging/logger.js';
 
 export interface TwilioConfig {
   accountSid: string;

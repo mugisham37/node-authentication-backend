@@ -1,13 +1,16 @@
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
+import type { SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   IAuditLogRepository,
   AuditLogFilters,
-} from '../../domain/repositories/audit-log.repository.js';
-import { AuditLog } from '../../domain/entities/audit-log.entity.js';
-import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
-import { auditLogs } from '../../core/database/schema/audit.schema.js';
-import { ServiceUnavailableError } from '../../core/errors/types/application-error.js';
+} from '../../../domain/repositories/audit-log.repository.js';
+import { AuditLog } from '../../../domain/entities/audit-log.entity.js';
+import { IPAddress } from '../../../domain/value-objects/ip-address.value-object.js';
+import { auditLogs } from '../../database/schema/audit.schema.js';
+import { ServiceUnavailableError } from '../../../shared/errors/types/application-error.js';
+
+type AuditLogRow = typeof auditLogs.$inferSelect;
 
 /**
  * Audit Log Repository Implementation using Drizzle ORM
@@ -25,24 +28,38 @@ export class AuditLogRepository implements IAuditLogRepository {
       const result = await this.db
         .insert(auditLogs)
         .values({
-          id: auditLog.id,
           userId: auditLog.userId,
           action: auditLog.action,
-          resource: auditLog.resource,
+          resource: auditLog.resource ?? '',
           resourceId: auditLog.resourceId,
           status: auditLog.status,
-          ipAddress: auditLog.ipAddress?.toString() || null,
+          ipAddress: auditLog.ipAddress?.toString() ?? null,
           userAgent: auditLog.userAgent,
           metadata: auditLog.metadata,
           riskScore: auditLog.riskScore,
-          createdAt: auditLog.createdAt,
         })
         .returning();
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      if (result.length === 0) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'Insert returned no rows',
+          operation: 'create',
+        });
+      }
+
+      const insertedRow = result[0];
+      if (!insertedRow) {
+        throw new ServiceUnavailableError('Database', {
+          originalError: 'Insert returned undefined row',
+          operation: 'create',
+        });
+      }
+
+      return this.mapToEntity(insertedRow);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: errorMessage,
         operation: 'create',
       });
     }
@@ -55,14 +72,15 @@ export class AuditLogRepository implements IAuditLogRepository {
     try {
       const result = await this.db.select().from(auditLogs).where(eq(auditLogs.id, id)).limit(1);
 
-      if (result.length === 0) {
+      if (result.length === 0 || !result[0]) {
         return null;
       }
 
       return this.mapToEntity(result[0]);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: (error as Error).message,
+        originalError: errorMessage,
         operation: 'findById',
       });
     }
@@ -74,10 +92,11 @@ export class AuditLogRepository implements IAuditLogRepository {
    */
   async query(filters: AuditLogFilters): Promise<AuditLog[]> {
     try {
-      let query = this.db.select().from(auditLogs);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+      let query: any = this.db.select().from(auditLogs);
 
       // Build WHERE conditions
-      const conditions: any[] = [];
+      const conditions: SQL[] = [];
 
       if (filters.userId) {
         conditions.push(eq(auditLogs.userId, filters.userId));
@@ -113,27 +132,34 @@ export class AuditLogRepository implements IAuditLogRepository {
 
       // Apply WHERE conditions
       if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        query = query.where(and(...conditions));
       }
 
       // Order by created date descending (most recent first)
-      query = query.orderBy(desc(auditLogs.createdAt)) as any;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      query = query.orderBy(desc(auditLogs.createdAt));
 
       // Apply pagination
       if (filters.limit) {
-        query = query.limit(filters.limit) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        query = query.limit(filters.limit);
       }
 
       if (filters.offset) {
-        query = query.offset(filters.offset) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        query = query.offset(filters.offset);
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const result = await query;
 
-      return result.map((row) => this.mapToEntity(row));
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+      return result.map((row: AuditLogRow) => this.mapToEntity(row));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: (error as Error).message,
+        originalError: errorMessage,
         operation: 'query',
       });
     }
@@ -146,7 +172,7 @@ export class AuditLogRepository implements IAuditLogRepository {
   async count(filters: AuditLogFilters): Promise<number> {
     try {
       // Build WHERE conditions
-      const conditions: any[] = [];
+      const conditions: SQL[] = [];
 
       if (filters.userId) {
         conditions.push(eq(auditLogs.userId, filters.userId));
@@ -180,19 +206,24 @@ export class AuditLogRepository implements IAuditLogRepository {
         conditions.push(lte(auditLogs.createdAt, filters.endDate));
       }
 
-      let query = this.db.select({ count: sql<number>`count(*)::int` }).from(auditLogs);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+      let query: any = this.db.select({ count: sql<number>`count(*)::int` }).from(auditLogs);
 
       // Apply WHERE conditions
       if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
+        query = query.where(and(...conditions));
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const result = await query;
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
       return result[0]?.count || 0;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: (error as Error).message,
+        originalError: errorMessage,
         operation: 'count',
       });
     }
@@ -213,8 +244,9 @@ export class AuditLogRepository implements IAuditLogRepository {
 
       return result.map((row) => this.mapToEntity(row));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: (error as Error).message,
+        originalError: errorMessage,
         operation: 'findHighRisk',
       });
     }
@@ -234,8 +266,9 @@ export class AuditLogRepository implements IAuditLogRepository {
 
       return result.map((row) => this.mapToEntity(row));
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: (error as Error).message,
+        originalError: errorMessage,
         operation: 'findRecentByUserId',
       });
     }
@@ -244,17 +277,17 @@ export class AuditLogRepository implements IAuditLogRepository {
   /**
    * Maps database row to AuditLog entity
    */
-  private mapToEntity(row: unknown): AuditLog {
+  private mapToEntity(row: AuditLogRow): AuditLog {
     return new AuditLog({
       id: row.id,
-      userId: row.userId,
+      userId: row.userId ?? null,
       action: row.action,
-      resource: row.resource,
-      resourceId: row.resourceId,
-      status: row.status,
+      resource: row.resource ?? null,
+      resourceId: row.resourceId ?? null,
+      status: row.status as 'success' | 'failure' | 'pending',
       ipAddress: row.ipAddress ? new IPAddress(row.ipAddress) : null,
-      userAgent: row.userAgent,
-      metadata: row.metadata || {},
+      userAgent: row.userAgent ?? null,
+      metadata: (row.metadata as Record<string, unknown>) ?? {},
       riskScore: row.riskScore,
       createdAt: row.createdAt,
     });

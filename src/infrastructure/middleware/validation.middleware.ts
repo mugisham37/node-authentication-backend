@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { z, ZodSchema, ZodError } from 'zod';
-import { ValidationError } from '../errors/types/application-error.js';
+import { ValidationError } from '../../shared/errors/types/application-error.js';
 
 export interface ValidationSchemas {
   body?: ZodSchema;

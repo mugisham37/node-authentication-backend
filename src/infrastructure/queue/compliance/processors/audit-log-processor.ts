@@ -6,10 +6,10 @@
 
 import { Job } from 'bullmq';
 import { randomUUID } from 'crypto';
-import { logger } from '../../logging/logger.js';
-import { AuditLog } from '../../../domain/entities/audit-log.entity.js';
-import { IPAddress } from '../../../domain/value-objects/ip-address.value-object.js';
-import type { IAuditLogRepository } from '../../../domain/repositories/audit-log.repository.js';
+import { log as logger } from '../../../logging/logger.js';
+import { AuditLog } from '../../../../domain/entities/audit-log.entity.js';
+import { IPAddress } from '../../../../domain/value-objects/ip-address.value-object.js';
+import type { IAuditLogRepository } from '../../../../domain/repositories/audit-log.repository.js';
 import { AuditLogJobData } from '../jobs/audit-log-jobs.js';
 
 /**

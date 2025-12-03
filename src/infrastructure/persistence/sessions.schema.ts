@@ -8,7 +8,7 @@ import {
   text,
   inet,
 } from 'drizzle-orm/pg-core';
-import { users } from './users.schema.js';
+import { users } from './schemas/users.schema.js';
 
 export const sessions = pgTable('sessions', {
   id: uuid('id').primaryKey().defaultRandom(),

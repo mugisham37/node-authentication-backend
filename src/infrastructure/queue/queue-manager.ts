@@ -5,15 +5,15 @@
  */
 
 import { Redis } from 'ioredis';
-import { logger } from '../logging/logger.js';
+import { log as logger } from '../logging/logger.js';
 import { EmailQueue } from './email-queue.js';
 import { WebhookQueue } from './webhook-queue.js';
 import { AuditLogQueue } from './audit-log-queue.js';
 import { CleanupQueue } from './cleanup-queue.js';
 import type { IEmailService } from '../../application/services/email.service.js';
-import type { IAuditLogRepository } from '../domain/repositories/audit-log.repository.js';
-import type { ISessionRepository } from '../domain/repositories/session.repository.js';
-import type { IDeviceRepository } from '../domain/repositories/device.repository.js';
+import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository.js';
+import type { ISessionRepository } from '../../domain/repositories/session.repository.js';
+import type { IDeviceRepository } from '../../domain/repositories/device.repository.js';
 
 export interface QueueManagerConfig {
   redisConnection: Redis;

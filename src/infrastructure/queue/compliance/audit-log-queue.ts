@@ -6,10 +6,10 @@
 
 import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
-import { logger } from '../logging/logger.js';
+import { log as logger } from '../../logging/logger.js';
 import { AUDIT_LOG_JOB_TYPES, AuditLogJobData } from './jobs/audit-log-jobs.js';
 import { AuditLogProcessor } from './processors/audit-log-processor.js';
-import type { IAuditLogRepository } from '../../domain/repositories/audit-log.repository.js';
+import type { IAuditLogRepository } from '../../../domain/repositories/audit-log.repository.js';
 
 export class AuditLogQueue {
   private queue: Queue<AuditLogJobData>;

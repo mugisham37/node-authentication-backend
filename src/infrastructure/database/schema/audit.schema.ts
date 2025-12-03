@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, text, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, text, jsonb, integer } from 'drizzle-orm/pg-core';
 import { users } from './users.schema.js';
 
 export const auditLogs = pgTable('audit_logs', {
@@ -13,6 +13,7 @@ export const auditLogs = pgTable('audit_logs', {
   status: varchar('status', { length: 20 }).notNull(),
   errorMessage: text('error_message'),
   metadata: jsonb('metadata'),
+  riskScore: integer('risk_score').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

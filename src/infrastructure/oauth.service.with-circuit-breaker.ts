@@ -5,10 +5,10 @@ import type {
   HandleCallbackInput,
   HandleCallbackOutput,
   OAuthProfile,
-} from '../../application/services/oauth.service.js';
-import { OAuthAccount } from '../../domain/entities/oauth-account.entity.js';
-import { CircuitBreaker } from '../../core/resilience/circuit-breaker.js';
-import { logger } from '../../core/logging/logger.js';
+} from '../application/services/oauth.service.js';
+import { OAuthAccount } from '../domain/entities/oauth-account.entity.js';
+import { CircuitBreaker } from './resilience/circuit-breaker.js';
+import { logger } from './logging/logger.js';
 
 /**
  * OAuth service wrapper with circuit breaker protection

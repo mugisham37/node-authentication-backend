@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { env } from '../config/env.js';
-import { RateLimitError } from '../errors/types/application-error.js';
+import { RateLimitError } from '../../shared/errors/types/application-error.js';
 import { container } from '../container/container.js';
 import { IRateLimitService } from '../../application/services/rate-limit.service.js';
 import { AuthenticatedRequest } from './authentication.middleware.js';

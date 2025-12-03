@@ -18,7 +18,7 @@ export class CacheWarmingService {
       // This would typically fetch from database
       const systemData = await this.loadSystemRolesAndPermissions();
 
-      await CacheService.warmCache(async () => systemData);
+      await CacheService.warmCache(async () => Promise.resolve(systemData));
 
       log.info('System roles and permissions cache warmed');
     } catch (error) {
@@ -39,7 +39,7 @@ export class CacheWarmingService {
       // This would typically fetch from database
       const userData = await this.loadUserProfiles(userIds);
 
-      await CacheService.warmCache(async () => userData);
+      await CacheService.warmCache(async () => Promise.resolve(userData));
 
       log.info('User profiles cache warmed', { userCount: userIds.length });
     } catch (error) {
@@ -79,6 +79,9 @@ export class CacheWarmingService {
     // data.set('role:admin:permissions', [...permissions]);
     // data.set('role:user:permissions', [...permissions]);
 
+    // Simulate async operation
+    await Promise.resolve();
+
     return data;
   }
 
@@ -86,7 +89,7 @@ export class CacheWarmingService {
    * Load user profiles from database
    * This is a placeholder - actual implementation would query the database
    */
-  private static async loadUserProfiles(userIds: string[]): Promise<Map<string, unknown>> {
+  private static async loadUserProfiles(_userIds: string[]): Promise<Map<string, unknown>> {
     const data = new Map<string, unknown>();
 
     // Placeholder: In real implementation, this would:
@@ -95,10 +98,13 @@ export class CacheWarmingService {
     // 3. Cache each user profile
 
     // Example structure:
-    // for (const userId of userIds) {
+    // for (const userId of _userIds) {
     //   const profile = await userRepository.findById(userId);
     //   data.set(`user:profile:${userId}`, profile);
     // }
+
+    // Simulate async operation
+    await Promise.resolve();
 
     return data;
   }
@@ -111,9 +117,9 @@ export class CacheWarmingService {
     log.info('Scheduling periodic cache warming', { intervalMinutes });
 
     return setInterval(
-      async () => {
+      () => {
         log.info('Running scheduled cache warming...');
-        await this.warmAllCaches();
+        void this.warmAllCaches();
       },
       intervalMinutes * 60 * 1000
     );

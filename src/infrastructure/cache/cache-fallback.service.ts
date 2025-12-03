@@ -109,8 +109,11 @@ function enforceFallbackCacheSize(): void {
   const entriesToRemove = fallbackCache.size - DEFAULT_CONFIG.maxFallbackSize;
   const keys = Array.from(fallbackCache.keys());
 
-  for (let i = 0; i < entriesToRemove; i++) {
-    fallbackCache.delete(keys[i]);
+  for (let i = 0; i < entriesToRemove && i < keys.length; i++) {
+    const key = keys[i];
+    if (key !== undefined) {
+      fallbackCache.delete(key);
+    }
   }
 
   logger.debug('Evicted entries from fallback cache', {

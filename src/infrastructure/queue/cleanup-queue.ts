@@ -7,7 +7,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import type { RepeatableJob } from 'bullmq';
 import { Redis } from 'ioredis';
-import { logger } from '../logging/logger.js';
+import { log as logger } from '../logging/logger.js';
 import {
   CLEANUP_JOB_TYPES,
   SessionCleanupJobData,
@@ -15,8 +15,8 @@ import {
   DeviceCleanupJobData,
 } from './jobs/cleanup-jobs.js';
 import { CleanupProcessor } from './processors/cleanup-processor.js';
-import type { ISessionRepository } from '../domain/repositories/session.repository.js';
-import type { IDeviceRepository } from '../domain/repositories/device.repository.js';
+import type { ISessionRepository } from '../../domain/repositories/session.repository.js';
+import type { IDeviceRepository } from '../../domain/repositories/device.repository.js';
 
 export class CleanupQueue {
   private queue: Queue;

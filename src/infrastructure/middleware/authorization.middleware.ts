@@ -1,7 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { AuthenticatedRequest } from './authentication.middleware.js';
-import { AuthorizationError } from '../../core/errors/types/application-error.js';
-import { container } from '../../core/container/container.js';
+import { AuthorizationError } from '../../shared/errors/types/application-error.js';
+import { container } from '../container/container.js';
 import { IAuthorizationService } from '../../application/services/authorization.service.js';
 import { logAuthorizationFailure } from './audit-logging.middleware.js';
 

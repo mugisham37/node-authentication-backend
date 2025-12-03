@@ -1,6 +1,6 @@
-import type { ISMSService, SendSMSInput } from '../../application/services/sms.service.js';
-import { CircuitBreaker } from '../../core/resilience/circuit-breaker.js';
-import { logger } from '../../core/logging/logger.js';
+import type { ISMSService, SendSMSInput } from '../../../application/services/sms.service.js';
+import { CircuitBreaker } from '../../resilience/circuit-breaker.js';
+import { log as logger } from '../../logging/logger.js';
 
 /**
  * SMS service wrapper with circuit breaker protection

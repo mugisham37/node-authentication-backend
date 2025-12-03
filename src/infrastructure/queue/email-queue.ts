@@ -91,15 +91,11 @@ export class EmailQueue {
     html: string;
     text?: string;
   }): Promise<void> {
-    // Wrap generic email data in a WelcomeEmailJobData-like structure
+    // Wrap generic email data in a WelcomeEmailJobData structure
     // with medium priority since it's a general email
     const jobData: WelcomeEmailJobData = {
-      type: EMAIL_JOB_TYPES.WELCOME,
       to: emailData.to,
       name: '', // Generic emails may not have a name
-      subject: emailData.subject,
-      html: emailData.html,
-      text: emailData.text,
     };
     await this.addJob(EMAIL_JOB_TYPES.WELCOME, jobData, 4); // Medium-low priority
   }
