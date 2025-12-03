@@ -99,7 +99,7 @@ export class AlertingService {
     // Track security events metric
     if (alert.type === AlertType.SECURITY_EVENT) {
       securityEvents.inc({
-        event_type: alert.metadata?.eventType as string || 'unknown',
+        event_type: (alert.metadata?.eventType as string) || 'unknown',
         severity: alert.severity,
       });
     }
@@ -290,4 +290,3 @@ export class AlertingService {
 
 // Export singleton instance
 export const alertingService = new AlertingService();
-

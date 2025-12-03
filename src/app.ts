@@ -228,7 +228,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 
     // Send alert for non-operational errors (Requirement 18.4)
     if (error instanceof ApplicationError && !error.isOperational) {
-      const { alertingService, AlertSeverity } = await import('./core/monitoring/alerting.service.js');
+      const { alertingService, AlertSeverity } =
+        await import('./core/monitoring/alerting.service.js');
       await alertingService.alertSecurityEvent(
         'non_operational_error',
         AlertSeverity.CRITICAL,

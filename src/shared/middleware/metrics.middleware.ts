@@ -1,8 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import {
-  httpRequestCounter,
-  httpRequestDuration,
-} from '../../core/monitoring/metrics.js';
+import { httpRequestCounter, httpRequestDuration } from '../../core/monitoring/metrics.js';
 
 /**
  * Middleware to track HTTP request metrics
@@ -39,4 +36,3 @@ export async function metricsMiddleware(
     );
   });
 }
-

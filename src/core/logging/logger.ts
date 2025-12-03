@@ -169,12 +169,7 @@ export const log = {
    * @param message - Log message
    * @param meta - Additional metadata
    */
-  sampled: (
-    key: string,
-    sampleRate: number,
-    message: string,
-    meta?: Record<string, unknown>
-  ) => {
+  sampled: (key: string, sampleRate: number, message: string, meta?: Record<string, unknown>) => {
     if (shouldSample(key, sampleRate)) {
       logger.info(message, { ...meta, sampled: true, sampleRate });
     }
