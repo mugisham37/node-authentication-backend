@@ -1,19 +1,20 @@
 import { DomainEvent } from './domain-event.js';
 
 /**
- * Event emitted when a user is created
+ * Event emitted when a new user registers
+ * Requirement: 1.1
  */
-export class UserCreatedEvent extends DomainEvent {
+export class UserRegisteredEvent extends DomainEvent {
   constructor(
     public readonly userId: string,
     public readonly email: string,
-    public readonly username?: string
+    public readonly name: string
   ) {
     super();
   }
 
   getEventName(): string {
-    return 'user.created';
+    return 'user.registered';
   }
 
   getAggregateId(): string {
@@ -22,18 +23,21 @@ export class UserCreatedEvent extends DomainEvent {
 }
 
 /**
- * Event emitted when a user's email is verified
+ * Event emitted when a user successfully logs in
+ * Requirement: 3.1
  */
-export class UserEmailVerifiedEvent extends DomainEvent {
+export class UserLoggedInEvent extends DomainEvent {
   constructor(
     public readonly userId: string,
-    public readonly email: string
+    public readonly sessionId: string,
+    public readonly ipAddress: string,
+    public readonly userAgent: string
   ) {
     super();
   }
 
   getEventName(): string {
-    return 'user.email_verified';
+    return 'user.logged_in';
   }
 
   getAggregateId(): string {
@@ -43,8 +47,9 @@ export class UserEmailVerifiedEvent extends DomainEvent {
 
 /**
  * Event emitted when a user's password is changed
+ * Requirement: 10.2, 17.2
  */
-export class UserPasswordChangedEvent extends DomainEvent {
+export class PasswordChangedEvent extends DomainEvent {
   constructor(
     public readonly userId: string,
     public readonly changedBy: string
@@ -62,19 +67,60 @@ export class UserPasswordChangedEvent extends DomainEvent {
 }
 
 /**
- * Event emitted when a user is suspended
+ * Event emitted when a user's email is verified
+ * Requirement: 2.1
  */
-export class UserSuspendedEvent extends DomainEvent {
+export class EmailVerifiedEvent extends DomainEvent {
   constructor(
     public readonly userId: string,
-    public readonly reason: string,
-    public readonly suspendedBy: string
+    public readonly email: string
   ) {
     super();
   }
 
   getEventName(): string {
-    return 'user.suspended';
+    return 'user.email_verified';
+  }
+
+  getAggregateId(): string {
+    return this.userId;
+  }
+}
+
+/**
+ * Event emitted when a user account is locked
+ * Requirement: 3.6
+ */
+export class AccountLockedEvent extends DomainEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly reason: string
+  ) {
+    super();
+  }
+
+  getEventName(): string {
+    return 'user.account_locked';
+  }
+
+  getAggregateId(): string {
+    return this.userId;
+  }
+}
+
+/**
+ * Event emitted when a user account is unlocked
+ */
+export class AccountUnlockedEvent extends DomainEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly unlockedBy: string
+  ) {
+    super();
+  }
+
+  getEventName(): string {
+    return 'user.account_unlocked';
   }
 
   getAggregateId(): string {
@@ -95,26 +141,6 @@ export class UserDeletedEvent extends DomainEvent {
 
   getEventName(): string {
     return 'user.deleted';
-  }
-
-  getAggregateId(): string {
-    return this.userId;
-  }
-}
-
-/**
- * Event emitted when a user updates their profile
- */
-export class UserProfileUpdatedEvent extends DomainEvent {
-  constructor(
-    public readonly userId: string,
-    public readonly updatedFields: string[]
-  ) {
-    super();
-  }
-
-  getEventName(): string {
-    return 'user.profile_updated';
   }
 
   getAggregateId(): string {

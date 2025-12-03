@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { ValidationError } from '../../core/errors/types/application-error.js';
+import { ValidationError } from '../../shared/errors/types/application-error.js';
 
 /**
  * DeviceFingerprint value object representing a unique device identifier.

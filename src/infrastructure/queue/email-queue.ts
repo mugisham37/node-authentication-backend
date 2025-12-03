@@ -85,13 +85,18 @@ export class EmailQueue {
    * Add a generic email job
    * Used for sending arbitrary emails that don't fit into specific categories
    */
-  async addEmailJob(emailData: { to: string; subject: string; html: string; text?: string }): Promise<void> {
+  async addEmailJob(emailData: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+  }): Promise<void> {
     // Wrap generic email data in a WelcomeEmailJobData-like structure
     // with medium priority since it's a general email
     const jobData: WelcomeEmailJobData = {
       type: EMAIL_JOB_TYPES.WELCOME,
       to: emailData.to,
-      name: '',  // Generic emails may not have a name
+      name: '', // Generic emails may not have a name
       subject: emailData.subject,
       html: emailData.html,
       text: emailData.text,

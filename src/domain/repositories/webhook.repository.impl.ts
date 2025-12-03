@@ -1,9 +1,6 @@
 import { eq, and, desc, lte, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import {
-  IWebhookRepository,
-  WebhookDelivery,
-} from './webhook.repository.interface.js';
+import { IWebhookRepository, WebhookDelivery } from './webhook.repository.interface.js';
 import { Webhook } from '../entities/webhook.entity.js';
 import {
   webhooks,
@@ -11,7 +8,10 @@ import {
   Webhook as WebhookRow,
   WebhookDelivery as WebhookDeliveryRow,
 } from '../../infrastructure/database/schema/webhooks.schema.js';
-import { NotFoundError, ServiceUnavailableError } from '../../shared/errors/types/application-error.js';
+import {
+  NotFoundError,
+  ServiceUnavailableError,
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * Webhook Repository Implementation using Drizzle ORM

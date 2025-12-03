@@ -5,7 +5,7 @@ import type {
 } from '../../application/services/webhook-delivery.service.js';
 import { WebhookQueue } from '../../infrastructure/queue/webhook-queue.js';
 import { logger } from '../../infrastructure/logging/logger.js';
-import { HmacService } from '../security/hashing/hmac.service.js';
+import { HmacService } from '../../infrastructure/security/hashing/hmac.service.js';
 
 export class WebhookDeliveryService implements IWebhookDeliveryService {
   private webhookQueue: WebhookQueue;

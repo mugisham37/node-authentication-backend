@@ -1,5 +1,5 @@
 import { ValidationError } from '../../shared/errors/types/application-error.js';
-import { Argon2Service } from '../../security/hashing/argon2.service.js';
+import { Argon2Service } from '../../infrastructure/security/hashing/argon2.service.js';
 
 /**
  * Password value object with complexity validation and Argon2id hashing.
@@ -49,14 +49,14 @@ export class Password {
    * - Parallelism: 4
    */
   async hash(): Promise<string> {
-    return Argon2Service.hashPassword(this.value);
+    return await Argon2Service.hashPassword(this.value);
   }
 
   /**
    * Verifies a password against a hash using constant-time comparison
    */
   async verify(passwordHash: string): Promise<boolean> {
-    return Argon2Service.verifyPassword(passwordHash, this.value);
+    return await Argon2Service.verifyPassword(passwordHash, this.value);
   }
 
   /**
