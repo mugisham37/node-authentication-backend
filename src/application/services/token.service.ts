@@ -1,4 +1,4 @@
-import { JwtService, TokenPair } from '../../../../shared/security/tokens/jwt.service.js';
+import { JwtService, TokenPair } from '../../infrastructure/security/tokens/jwt.service.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 /**

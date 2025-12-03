@@ -2,13 +2,13 @@ import { randomBytes, createHash } from 'crypto';
 import { User } from '../../domain/entities/user.entity.js';
 import { OAuthAccount } from '../../domain/entities/oauth-account.entity.js';
 import { Email } from '../../domain/value-objects/email.value-object.js';
-import { IUserRepository } from '../../domain/repositories/user.repository.js';
+import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
 import { IOAuthAccountRepository } from '../../domain/repositories/oauth-account.repository.js';
 import {
   AuthenticationError,
   ValidationError,
   NotFoundError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 
 /**
  * OAuth provider configuration
@@ -34,6 +34,47 @@ export interface OAuthProfile {
   name: string;
   image?: string;
   emailVerified?: boolean;
+}
+
+/**
+ * Google OAuth user info response
+ */
+interface GoogleUserInfo {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  verified_email: boolean;
+}
+
+/**
+ * GitHub OAuth user info response
+ */
+interface GitHubUserInfo {
+  id: number;
+  email: string;
+  name: string | null;
+  login: string;
+  avatar_url: string;
+}
+
+/**
+ * Microsoft OAuth user info response
+ */
+interface MicrosoftUserInfo {
+  id: string;
+  mail?: string;
+  userPrincipalName: string;
+  displayName: string;
+}
+
+/**
+ * OAuth token response
+ */
+interface OAuthTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
 }
 
 /**
@@ -96,7 +137,7 @@ export interface IOAuthService {
    * Generate OAuth authorization URL with PKCE
    * Requirements: 9.1
    */
-  generateAuthorizationUrl(input: GenerateAuthUrlInput): Promise<GenerateAuthUrlOutput>;
+  generateAuthorizationUrl(input: GenerateAuthUrlInput): GenerateAuthUrlOutput;
 
   /**
    * Handle OAuth callback and code exchange
@@ -151,10 +192,10 @@ export class OAuthService implements IOAuthService {
   private initializeProviders(): void {
     // Google OAuth configuration
     this.providers.set('google', {
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      clientId: process.env['GOOGLE_CLIENT_ID'] || '',
+      clientSecret: process.env['GOOGLE_CLIENT_SECRET'] || '',
       redirectUri:
-        process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/v1/oauth/google/callback',
+        process.env['GOOGLE_REDIRECT_URI'] || 'http://localhost:3000/api/v1/oauth/google/callback',
       authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
       userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
@@ -163,10 +204,10 @@ export class OAuthService implements IOAuthService {
 
     // GitHub OAuth configuration
     this.providers.set('github', {
-      clientId: process.env.GITHUB_CLIENT_ID || '',
-      clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+      clientId: process.env['GITHUB_CLIENT_ID'] || '',
+      clientSecret: process.env['GITHUB_CLIENT_SECRET'] || '',
       redirectUri:
-        process.env.GITHUB_REDIRECT_URI || 'http://localhost:3000/api/v1/oauth/github/callback',
+        process.env['GITHUB_REDIRECT_URI'] || 'http://localhost:3000/api/v1/oauth/github/callback',
       authorizationUrl: 'https://github.com/login/oauth/authorize',
       tokenUrl: 'https://github.com/login/oauth/access_token',
       userInfoUrl: 'https://api.github.com/user',
@@ -175,10 +216,10 @@ export class OAuthService implements IOAuthService {
 
     // Microsoft OAuth configuration
     this.providers.set('microsoft', {
-      clientId: process.env.MICROSOFT_CLIENT_ID || '',
-      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || '',
+      clientId: process.env['MICROSOFT_CLIENT_ID'] || '',
+      clientSecret: process.env['MICROSOFT_CLIENT_SECRET'] || '',
       redirectUri:
-        process.env.MICROSOFT_REDIRECT_URI ||
+        process.env['MICROSOFT_REDIRECT_URI'] ||
         'http://localhost:3000/api/v1/oauth/microsoft/callback',
       authorizationUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
       tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
@@ -191,7 +232,7 @@ export class OAuthService implements IOAuthService {
    * Generate OAuth authorization URL with PKCE
    * Requirements: 9.1
    */
-  async generateAuthorizationUrl(input: GenerateAuthUrlInput): Promise<GenerateAuthUrlOutput> {
+  generateAuthorizationUrl(input: GenerateAuthUrlInput): GenerateAuthUrlOutput {
     const provider = this.providers.get(input.provider.toLowerCase());
     if (!provider) {
       throw new ValidationError(`Unsupported OAuth provider: ${input.provider}`);
@@ -318,7 +359,7 @@ export class OAuthService implements IOAuthService {
         throw new AuthenticationError('Failed to fetch user profile from OAuth provider');
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as GoogleUserInfo | GitHubUserInfo | MicrosoftUserInfo;
 
       // Map provider-specific response to standard profile format
       return this.mapProviderProfileToStandard(provider, data);
@@ -420,7 +461,7 @@ export class OAuthService implements IOAuthService {
         throw new AuthenticationError('Failed to exchange authorization code for tokens');
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as OAuthTokenResponse;
 
       return {
         accessToken: data.access_token,
@@ -461,34 +502,43 @@ export class OAuthService implements IOAuthService {
    * Map provider-specific profile to standard format
    * Requirements: 9.3
    */
-  private mapProviderProfileToStandard(provider: string, data: unknown): OAuthProfile {
+  private mapProviderProfileToStandard(
+    provider: string,
+    data: GoogleUserInfo | GitHubUserInfo | MicrosoftUserInfo
+  ): OAuthProfile {
     switch (provider.toLowerCase()) {
-      case 'google':
+      case 'google': {
+        const googleData = data as GoogleUserInfo;
         return {
-          id: data.id,
-          email: data.email,
-          name: data.name,
-          image: data.picture,
-          emailVerified: data.verified_email,
+          id: googleData.id,
+          email: googleData.email,
+          name: googleData.name,
+          image: googleData.picture,
+          emailVerified: googleData.verified_email,
         };
+      }
 
-      case 'github':
+      case 'github': {
+        const githubData = data as GitHubUserInfo;
         return {
-          id: data.id.toString(),
-          email: data.email,
-          name: data.name || data.login,
-          image: data.avatar_url,
+          id: githubData.id.toString(),
+          email: githubData.email,
+          name: githubData.name || githubData.login,
+          image: githubData.avatar_url,
           emailVerified: true, // GitHub emails are verified
         };
+      }
 
-      case 'microsoft':
+      case 'microsoft': {
+        const microsoftData = data as MicrosoftUserInfo;
         return {
-          id: data.id,
-          email: data.mail || data.userPrincipalName,
-          name: data.displayName,
-          image: null, // Microsoft Graph doesn't provide avatar URL directly
+          id: microsoftData.id,
+          email: microsoftData.mail || microsoftData.userPrincipalName,
+          name: microsoftData.displayName,
+          image: undefined, // Microsoft Graph doesn't provide avatar URL directly
           emailVerified: true, // Microsoft emails are verified
         };
+      }
 
       default:
         throw new ValidationError(`Unsupported OAuth provider: ${provider}`);

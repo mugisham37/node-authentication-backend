@@ -5,14 +5,14 @@ import { Email } from '../../domain/value-objects/email.value-object.js';
 import { Password } from '../../domain/value-objects/password.value-object.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
-import { IUserRepository } from '../../domain/repositories/user.repository.js';
+import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
 import { ISessionRepository } from '../../domain/repositories/session.repository.js';
 import {
   AuthenticationError,
   ConflictError,
   NotFoundError,
   ValidationError,
-} from '../../core/errors/types/application-error.js';
+} from '../../shared/errors/types/application-error.js';
 import { domainEventEmitter } from '../../domain/events/event-emitter.js';
 import { PasswordChangedEvent } from '../../domain/events/user-events.js';
 import {
@@ -22,7 +22,7 @@ import {
   authenticationAttempts,
   authenticationDuration,
   failedLoginAttempts,
-} from '../../core/monitoring/metrics.js';
+} from '../../infrastructure/monitoring/metrics.js';
 
 /**
  * Input for user registration

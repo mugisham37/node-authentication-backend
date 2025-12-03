@@ -2,7 +2,7 @@ import { Role } from '../../domain/entities/role.entity.js';
 import { Permission } from '../../domain/entities/permission.entity.js';
 import { IRoleRepository } from '../../domain/repositories/role.repository.js';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.js';
-import { log } from '../../core/logging/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { randomUUID } from 'crypto';
 
 /**
@@ -23,7 +23,7 @@ export class SystemRolesService {
    */
   async initializeSystemRoles(): Promise<void> {
     try {
-      log.info('Initializing system roles and permissions');
+      logger.info('Initializing system roles and permissions');
 
       // Create permissions first
       const permissions = await this.createSystemPermissions();
@@ -33,9 +33,9 @@ export class SystemRolesService {
       await this.createModeratorRole(permissions);
       await this.createUserRole(permissions);
 
-      log.info('System roles and permissions initialized successfully');
+      logger.info('System roles and permissions initialized successfully');
     } catch (error) {
-      log.error('Failed to initialize system roles', error as Error);
+      logger.error('Failed to initialize system roles', error as Error);
       throw error;
     }
   }
@@ -116,7 +116,7 @@ export class SystemRolesService {
     );
 
     if (existing) {
-      log.debug('Permission already exists', { resource: def.resource, action: def.action });
+      logger.debug('Permission already exists', { resource: def.resource, action: def.action });
       return existing;
     }
 
@@ -128,7 +128,7 @@ export class SystemRolesService {
     });
 
     const saved = await this.permissionRepository.save(permission);
-    log.debug('Permission created', { resource: def.resource, action: def.action });
+    logger.debug('Permission created', { resource: def.resource, action: def.action });
     return saved;
   }
 
@@ -142,7 +142,7 @@ export class SystemRolesService {
     // Check if role already exists
     const existing = await this.roleRepository.findByName(roleName);
     if (existing) {
-      log.info('Admin role already exists', { roleId: existing.id });
+      logger.info('Admin role already exists', { roleId: existing.id });
       return;
     }
 
@@ -167,7 +167,7 @@ export class SystemRolesService {
       await this.roleRepository.addPermission(saved.id, wildcardPermission.id);
     }
 
-    log.info('Admin role created', { roleId: saved.id });
+    logger.info('Admin role created', { roleId: saved.id });
   }
 
   /**
@@ -180,7 +180,7 @@ export class SystemRolesService {
     // Check if role already exists
     const existing = await this.roleRepository.findByName(roleName);
     if (existing) {
-      log.info('Moderator role already exists', { roleId: existing.id });
+      logger.info('Moderator role already exists', { roleId: existing.id });
       return;
     }
 
@@ -221,7 +221,7 @@ export class SystemRolesService {
       }
     }
 
-    log.info('Moderator role created', { roleId: saved.id });
+    logger.info('Moderator role created', { roleId: saved.id });
   }
 
   /**
@@ -234,7 +234,7 @@ export class SystemRolesService {
     // Check if role already exists
     const existing = await this.roleRepository.findByName(roleName);
     if (existing) {
-      log.info('User role already exists', { roleId: existing.id });
+      logger.info('User role already exists', { roleId: existing.id });
       return;
     }
 
@@ -278,6 +278,6 @@ export class SystemRolesService {
       }
     }
 
-    log.info('User role created', { roleId: saved.id });
+    logger.info('User role created', { roleId: saved.id });
   }
 }

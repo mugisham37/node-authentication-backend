@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'crypto';
 import speakeasy from 'speakeasy';
-import { IUserRepository } from '../../domain/repositories/user.repository.js';
+import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
 import { ISessionRepository } from '../../domain/repositories/session.repository.js';
 import { Session } from '../../domain/entities/session.entity.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
@@ -9,10 +9,10 @@ import {
   AuthenticationError,
   NotFoundError,
   ValidationError,
-} from '../../core/errors/types/application-error.js';
-import * as redis from '../../core/cache/redis.js';
+} from '../../shared/errors/types/application-error.js';
+import * as redis from '../../infrastructure/cache/redis.js';
 import { domainEventEmitter } from '../../domain/events/event-emitter.js';
-import { MFAEnabledEvent, MFADisabledEvent } from '../../domain/events/mfa-events.js';
+import { MfaEnabledEvent, MfaDisabledEvent } from '../../domain/events/mfa-events.js';
 
 /**
  * Input for TOTP MFA setup
@@ -257,7 +257,7 @@ export class MFAService implements IMFAService {
     await this.userRepository.update(user);
 
     // Emit MFA enabled event (Requirement 17.3)
-    await domainEventEmitter.emit(new MFAEnabledEvent(user.id, 'totp'));
+    await domainEventEmitter.emit(new MfaEnabledEvent(user.id, 'totp'));
   }
 
   /**
@@ -303,7 +303,7 @@ export class MFAService implements IMFAService {
     await this.userRepository.update(user);
 
     // Emit MFA disabled event (Requirement 17.3)
-    await domainEventEmitter.emit(new MFADisabledEvent(user.id, user.id));
+    await domainEventEmitter.emit(new MfaDisabledEvent(user.id, user.id));
   }
 
   /**

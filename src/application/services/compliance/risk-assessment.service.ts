@@ -1,6 +1,6 @@
-import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
-import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
-import { log } from '../../core/logging/logger.js';
+import { IPAddress } from '../../../domain/value-objects/ip-address.value-object.js';
+import { DeviceFingerprint } from '../../../domain/value-objects/device-fingerprint.value-object.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 /**
  * Security alert severity levels
@@ -179,7 +179,7 @@ export class RiskAssessmentService implements IRiskAssessmentService {
     const riskLevel = this.getRiskLevel(riskScore);
     const requiresStepUp = riskScore >= this.STEP_UP_THRESHOLD;
 
-    log.info('Risk assessment completed', {
+    logger.info('Risk assessment completed', {
       userId,
       riskScore,
       riskLevel,
@@ -340,6 +340,111 @@ export class RiskAssessmentService implements IRiskAssessmentService {
 
     // Ensure score is within 0-100 range
     return Math.max(0, Math.min(100, Math.round(score)));
+  }
+
+  /**
+   * Helper: Assess failed login attempts
+   * Requirement: 18.1
+   */
+  private assessFailedAttempts(
+    userId: string,
+    previousAttempts: LoginAttempt[],
+    factors: string[],
+    alerts: SecurityAlert[]
+  ): number {
+    const recentFailures = previousAttempts.filter(
+      (a) => !a.success && Date.now() - a.timestamp.getTime() < 15 * 60 * 1000
+    );
+
+    if (recentFailures.length >= 3) {
+      factors.push(`${recentFailures.length} failed login attempts in last 15 minutes`);
+      alerts.push(
+        this.createAlert(userId, 'failed_login_pattern', 'high', {
+          failedAttempts: recentFailures.length,
+        })
+      );
+    }
+
+    return recentFailures.length;
+  }
+
+  /**
+   * Helper: Assess location-based risks
+   * Requirement: 18.3
+   */
+  private assessLocationRisks(
+    userId: string,
+    location: string | undefined,
+    previousAttempts: LoginAttempt[],
+    factors: string[],
+    alerts: SecurityAlert[]
+  ): { isNewLocation: boolean; isImpossibleTravel: boolean } {
+    const isNewLocation = this.isUnusualLocation(location, previousAttempts);
+    if (isNewLocation && location) {
+      factors.push(`New location: ${location}`);
+      alerts.push(
+        this.createAlert(userId, 'unusual_location', 'medium', {
+          location,
+        })
+      );
+    }
+
+    // Check for impossible travel
+    const lastSuccessfulAttempt = previousAttempts
+      .filter((a) => a.success)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+
+    const isImpossibleTravel =
+      lastSuccessfulAttempt && location
+        ? this.detectImpossibleTravel(
+            location,
+            lastSuccessfulAttempt.location,
+            Date.now() - lastSuccessfulAttempt.timestamp.getTime()
+          )
+        : false;
+
+    if (isImpossibleTravel) {
+      factors.push('Impossible travel detected');
+      alerts.push(
+        this.createAlert(userId, 'impossible_travel', 'critical', {
+          currentLocation: location,
+          previousLocation: lastSuccessfulAttempt?.location,
+        })
+      );
+    }
+
+    return { isNewLocation, isImpossibleTravel };
+  }
+
+  /**
+   * Helper: Assess device fingerprint and velocity
+   * Requirement: 15.5, 18.1
+   */
+  private assessDeviceAndVelocity(
+    userId: string,
+    deviceFingerprint: DeviceFingerprint,
+    previousAttempts: LoginAttempt[],
+    factors: string[]
+  ): { isNewDevice: boolean; velocityScore: number } {
+    // Check if device is known
+    const knownFingerprints = previousAttempts
+      .filter((a) => a.success && a.deviceFingerprint)
+      .map((a) => a.deviceFingerprint?.toString() || '');
+
+    const isNewDevice = !this.isKnownDevice(deviceFingerprint, knownFingerprints);
+
+    if (isNewDevice) {
+      factors.push('New device detected');
+    }
+
+    // Check velocity (attempts per minute)
+    const velocityScore = this.checkVelocity(userId, previousAttempts, 60 * 1000);
+
+    if (velocityScore > 0.5) {
+      factors.push(`High velocity: ${velocityScore.toFixed(2)} score`);
+    }
+
+    return { isNewDevice, velocityScore };
   }
 
   /**

@@ -3,8 +3,8 @@ import { Session } from '../../domain/entities/session.entity.js';
 import { ISessionRepository } from '../../domain/repositories/session.repository.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
-import { NotFoundError, AuthenticationError } from '../../core/errors/types/application-error.js';
-import { log } from '../../core/logging/logger.js';
+import { NotFoundError, AuthenticationError } from '../../shared/errors/types/application-error.js';
+import { log } from '../../infrastructure/logging/logger.js';
 import { domainEventEmitter } from '../../domain/events/event-emitter.js';
 import { SessionCreatedEvent, SessionRevokedEvent } from '../../domain/events/session-events.js';
 

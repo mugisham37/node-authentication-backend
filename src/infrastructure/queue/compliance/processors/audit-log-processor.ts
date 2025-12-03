@@ -44,7 +44,7 @@ export class AuditLogProcessor {
     });
 
     try {
-      const auditLog = await this.createAuditLog(input);
+      const auditLog = this.createAuditLog(input);
       await this.saveAuditLog(auditLog);
 
       // Generate security alert for high-risk events (Requirement: 13.4)
@@ -69,7 +69,7 @@ export class AuditLogProcessor {
    * Create audit log entity from job data
    * Requirement: 13.3
    */
-  private async createAuditLog(input: AuditLogJobData): Promise<AuditLog> {
+  private createAuditLog(input: AuditLogJobData): AuditLog {
     // Parse IP address if provided
     const ipAddress = this.parseIPAddress(input.ipAddress);
 

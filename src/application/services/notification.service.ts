@@ -1,4 +1,4 @@
-import { connectionManager } from '../../presentation/websocket/connection-manager.js';
+import { connectionManager } from '../../api/rest/websocket/connection-manager.js';
 import { logger } from '../../infrastructure/logging/logger.js';
 
 /**
@@ -22,7 +22,7 @@ export interface NotificationPayload {
   title: string;
   message: string;
   timestamp: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 /**

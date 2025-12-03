@@ -3,8 +3,8 @@ import { Device } from '../../domain/entities/device.entity.js';
 import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint.value-object.js';
 import { IDeviceRepository } from '../../domain/repositories/device.repository.js';
 import { ISessionRepository } from '../../domain/repositories/session.repository.js';
-import { NotFoundError } from '../../core/errors/types/application-error.js';
-import { log } from '../../core/logging/logger.js';
+import { NotFoundError } from '../../shared/errors/types/application-error.js';
+import { log } from '../../infrastructure/logging/logger.js';
 
 /**
  * Input for device registration

@@ -1,9 +1,9 @@
 import { User } from '../../domain/entities/user.entity.js';
-import { IUserRepository } from '../../domain/repositories/user.repository.js';
+import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
 import { Password } from '../../domain/value-objects/password.value-object.js';
-import { NotFoundError, ValidationError } from '../../core/errors/types/application-error.js';
-import { CacheService } from '../../core/cache/cache.service.js';
-import { log } from '../../core/logging/logger.js';
+import { NotFoundError, ValidationError } from '../../shared/errors/types/application-error.js';
+import { CacheService } from '../../infrastructure/cache/cache.service.js';
+import { log } from '../../infrastructure/logging/logger.js';
 
 export interface IUserService {
   getUserById(userId: string): Promise<User>;

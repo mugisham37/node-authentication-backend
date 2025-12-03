@@ -2,9 +2,9 @@ import { Role } from '../../domain/entities/role.entity.js';
 import { Permission } from '../../domain/entities/permission.entity.js';
 import { IRoleRepository } from '../../domain/repositories/role.repository.js';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.js';
-import { NotFoundError } from '../../core/errors/types/application-error.js';
-import * as cache from '../../core/cache/redis.js';
-import { log } from '../../core/logging/logger.js';
+import { NotFoundError } from '../../shared/errors/types/application-error.js';
+import * as cache from '../../infrastructure/cache/redis.js';
+import { log } from '../../infrastructure/logging/logger.js';
 
 /**
  * Authorization service interface

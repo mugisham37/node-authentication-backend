@@ -1,13 +1,13 @@
 import { randomUUID } from 'crypto';
 import { Queue, Worker, Job } from 'bullmq';
-import { AuditLog } from '../../domain/entities/audit-log.entity.js';
-import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
+import { AuditLog } from '../../../domain/entities/audit-log.entity.js';
+import { IPAddress } from '../../../domain/value-objects/ip-address.value-object.js';
 import {
   IAuditLogRepository,
   AuditLogFilters,
-} from '../../domain/repositories/audit-log.repository.js';
-import { log } from '../../core/logging/logger.js';
-import { getRedisConnection } from '../../core/cache/redis.js';
+} from '../../../domain/repositories/audit-log.repository.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
+import { getRedisConnection } from '../../../infrastructure/cache/redis.js';
 
 /**
  * Input for creating an audit log
@@ -120,14 +120,14 @@ export class AuditLogService implements IAuditLogService {
         },
       });
 
-      log.debug('Audit log job queued', {
+      logger.debug('Audit log job queued', {
         action: input.action,
         userId: input.userId,
         status: input.status,
       });
     } catch (error) {
       // Log error but don't throw - audit logging should not break main flow
-      log.error('Failed to queue audit log', error as Error, {
+      logger.error('Failed to queue audit log', error as Error, {
         action: input.action,
         userId: input.userId,
       });
@@ -150,7 +150,7 @@ export class AuditLogService implements IAuditLogService {
         this.auditLogRepository.count(filters),
       ]);
 
-      log.debug('Audit logs queried', {
+      logger.debug('Audit logs queried', {
         filters,
         resultCount: logs.length,
         total,
@@ -163,7 +163,7 @@ export class AuditLogService implements IAuditLogService {
         pageSize: limit,
       };
     } catch (error) {
-      log.error('Failed to query audit logs', error as Error, { filters });
+      logger.error('Failed to query audit logs', error as Error, { filters });
       throw error;
     }
   }
@@ -175,7 +175,7 @@ export class AuditLogService implements IAuditLogService {
     try {
       return await this.auditLogRepository.findById(id);
     } catch (error) {
-      log.error('Failed to get audit log by ID', error as Error, { id });
+      logger.error('Failed to get audit log by ID', error as Error, { id });
       throw error;
     }
   }
@@ -187,7 +187,7 @@ export class AuditLogService implements IAuditLogService {
     try {
       return await this.auditLogRepository.findRecentByUserId(userId, limit);
     } catch (error) {
-      log.error('Failed to get recent user audit logs', error as Error, { userId });
+      logger.error('Failed to get recent user audit logs', error as Error, { userId });
       throw error;
     }
   }
@@ -198,7 +198,7 @@ export class AuditLogService implements IAuditLogService {
    */
   startWorker(): void {
     if (this.worker) {
-      log.warn('Audit log worker already running');
+      logger.warn('Audit log worker already running');
       return;
     }
 
@@ -216,17 +216,17 @@ export class AuditLogService implements IAuditLogService {
     );
 
     this.worker.on('completed', (job) => {
-      log.debug('Audit log job completed', { jobId: job.id });
+      logger.debug('Audit log job completed', { jobId: job.id });
     });
 
     this.worker.on('failed', (job, error) => {
-      log.error('Audit log job failed', error, {
+      logger.error('Audit log job failed', error, {
         jobId: job?.id,
         attempts: job?.attemptsMade,
       });
     });
 
-    log.info('Audit log worker started');
+    logger.info('Audit log worker started');
   }
 
   /**
@@ -240,7 +240,7 @@ export class AuditLogService implements IAuditLogService {
     await this.worker.close();
     this.worker = null;
 
-    log.info('Audit log worker stopped');
+    logger.info('Audit log worker stopped');
   }
 
   /**
@@ -257,7 +257,7 @@ export class AuditLogService implements IAuditLogService {
         try {
           ipAddress = new IPAddress(input.ipAddress);
         } catch (error) {
-          log.warn('Invalid IP address in audit log', {
+          logger.warn('Invalid IP address in audit log', {
             ipAddress: input.ipAddress,
             error: (error as Error).message,
           });
@@ -285,7 +285,7 @@ export class AuditLogService implements IAuditLogService {
       // Save to database (Requirement: 13.1, 13.6)
       await this.auditLogRepository.create(auditLog);
 
-      log.info('Audit log created', {
+      logger.info('Audit log created', {
         id: auditLog.id,
         action: auditLog.action,
         userId: auditLog.userId,
@@ -299,7 +299,7 @@ export class AuditLogService implements IAuditLogService {
         this.generateSecurityAlert(auditLog);
       }
     } catch (error) {
-      log.error('Failed to process audit log job', error as Error, {
+      logger.error('Failed to process audit log job', error as Error, {
         jobId: job.id,
         action: input.action,
         userId: input.userId,
@@ -336,7 +336,7 @@ export class AuditLogService implements IAuditLogService {
       // 2. Send notifications (email, Slack, PagerDuty, etc.)
       // 3. Trigger automated responses (rate limiting, account lockout, etc.)
 
-      log.warn('Security alert generated', {
+      logger.warn('Security alert generated', {
         alertId: alert.auditLogId,
         userId: alert.userId,
         action: alert.action,
@@ -347,7 +347,7 @@ export class AuditLogService implements IAuditLogService {
       // For now, just log the alert
       // In production, integrate with alerting services
     } catch (error) {
-      log.error('Failed to generate security alert', error as Error, {
+      logger.error('Failed to generate security alert', error as Error, {
         auditLogId: auditLog.id,
       });
       // Don't throw - alert generation failure should not break audit logging
