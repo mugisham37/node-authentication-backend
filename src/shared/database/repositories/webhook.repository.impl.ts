@@ -3,13 +3,15 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
   IWebhookRepository,
   WebhookDelivery,
-} from '../../domain/repositories/webhook.repository.js';
+} from '../../domain/repositories/webhook.repository.interface.js';
 import { Webhook } from '../../domain/entities/webhook.entity.js';
-import { webhooks, webhookDeliveries } from '../../core/database/schema/webhooks.schema.js';
 import {
-  NotFoundError,
-  ServiceUnavailableError,
-} from '../../../core/errors/types/application-error.js';
+  webhooks,
+  webhookDeliveries,
+  Webhook as WebhookRow,
+  WebhookDelivery as WebhookDeliveryRow,
+} from '../schema/webhooks.schema.js';
+import { NotFoundError, ServiceUnavailableError } from '../../errors/types/application-error.js';
 
 /**
  * Webhook Repository Implementation using Drizzle ORM
@@ -38,15 +40,23 @@ export class WebhookRepository implements IWebhookRepository {
         })
         .returning();
 
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          operation: 'create',
+          reason: 'No result returned from insert',
+        });
+      }
+
       return this.mapToEntity(result[0]);
-    } catch (error: any) {
+    } catch (error) {
       // Handle foreign key violation
-      if (error.code === '23503') {
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23503') {
         throw new NotFoundError('User');
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: errorMessage,
         operation: 'create',
       });
     }
@@ -63,10 +73,18 @@ export class WebhookRepository implements IWebhookRepository {
         return null;
       }
 
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          operation: 'findById',
+          reason: 'No result returned',
+        });
+      }
+
       return this.mapToEntity(result[0]);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: (error as Error).message,
+        originalError: errorMessage,
         operation: 'findById',
       });
     }
@@ -136,14 +154,23 @@ export class WebhookRepository implements IWebhookRepository {
         throw new NotFoundError('Webhook');
       }
 
-      return this.mapToEntity(result[0]);
-    } catch (error: any) {
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          operation: 'update',
+          reason: 'No result returned',
+        });
+      }
+
+      const row = result[0];
+      return this.mapToEntity(row);
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: errorMessage,
         operation: 'update',
       });
     }
@@ -160,13 +187,14 @@ export class WebhookRepository implements IWebhookRepository {
       if (result.length === 0) {
         throw new NotFoundError('Webhook');
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: errorMessage,
         operation: 'delete',
       });
     }
@@ -201,23 +229,32 @@ export class WebhookRepository implements IWebhookRepository {
           eventType: delivery.eventType,
           payload: delivery.payload,
           status: delivery.status,
-          httpStatusCode: delivery.httpStatusCode,
-          responseBody: delivery.responseBody,
+          httpStatusCode: delivery.httpStatusCode as number | null | undefined,
+          responseBody: delivery.responseBody as string | null | undefined,
           attemptCount: delivery.attemptCount,
-          nextRetryAt: delivery.nextRetryAt,
-          deliveredAt: delivery.deliveredAt,
+          nextRetryAt: delivery.nextRetryAt as Date | null | undefined,
+          deliveredAt: delivery.deliveredAt as Date | null | undefined,
         })
         .returning();
 
-      return this.mapDeliveryToObject(result[0]);
-    } catch (error: any) {
-      // Handle foreign key violation
-      if (error.code === '23503') {
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          operation: 'createDelivery',
+          reason: 'No result returned',
+        });
+      }
+
+      const row = result[0];
+      return this.mapDeliveryToObject(row);
+    } catch (error) {
+      // Check if error is due to foreign key violation (webhook doesn't exist)
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23503') {
         throw new NotFoundError('Webhook');
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: errorMessage,
         operation: 'createDelivery',
       });
     }
@@ -229,16 +266,11 @@ export class WebhookRepository implements IWebhookRepository {
    */
   async updateDelivery(id: string, updates: Partial<WebhookDelivery>): Promise<WebhookDelivery> {
     try {
+      const updateData = this.buildDeliveryUpdateData(updates);
+
       const result = await this.db
         .update(webhookDeliveries)
-        .set({
-          status: updates.status,
-          httpStatusCode: updates.httpStatusCode,
-          responseBody: updates.responseBody,
-          attemptCount: updates.attemptCount,
-          nextRetryAt: updates.nextRetryAt,
-          deliveredAt: updates.deliveredAt,
-        })
+        .set(updateData)
         .where(eq(webhookDeliveries.id, id))
         .returning();
 
@@ -246,17 +278,54 @@ export class WebhookRepository implements IWebhookRepository {
         throw new NotFoundError('WebhookDelivery');
       }
 
-      return this.mapDeliveryToObject(result[0]);
-    } catch (error: any) {
+      if (!result[0]) {
+        throw new ServiceUnavailableError('Database', {
+          operation: 'updateDelivery',
+          reason: 'No result returned',
+        });
+      }
+
+      const row = result[0];
+      return this.mapDeliveryToObject(row);
+    } catch (error) {
       if (error instanceof NotFoundError) {
         throw error;
       }
 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new ServiceUnavailableError('Database', {
-        originalError: error.message,
+        originalError: errorMessage,
         operation: 'updateDelivery',
       });
     }
+  }
+
+  /**
+   * Build update data for delivery
+   */
+  private buildDeliveryUpdateData(updates: Partial<WebhookDelivery>): Partial<WebhookDeliveryRow> {
+    const updateData: Partial<WebhookDeliveryRow> = {};
+
+    if ('status' in updates && updates.status !== undefined) {
+      updateData.status = updates.status;
+    }
+    if ('httpStatusCode' in updates) {
+      updateData.httpStatusCode = updates.httpStatusCode;
+    }
+    if ('responseBody' in updates) {
+      updateData.responseBody = updates.responseBody;
+    }
+    if ('attemptCount' in updates && updates.attemptCount !== undefined) {
+      updateData.attemptCount = updates.attemptCount;
+    }
+    if ('nextRetryAt' in updates) {
+      updateData.nextRetryAt = updates.nextRetryAt;
+    }
+    if ('deliveredAt' in updates) {
+      updateData.deliveredAt = updates.deliveredAt;
+    }
+
+    return updateData;
   }
 
   /**
@@ -313,12 +382,12 @@ export class WebhookRepository implements IWebhookRepository {
   /**
    * Maps database row to Webhook entity
    */
-  private mapToEntity(row: any): Webhook {
+  private mapToEntity(row: WebhookRow): Webhook {
     return new Webhook({
       id: row.id,
       userId: row.userId,
       url: row.url,
-      events: row.events,
+      events: row.events as string[],
       secret: row.secret,
       isActive: row.isActive,
       createdAt: row.createdAt,
@@ -329,18 +398,18 @@ export class WebhookRepository implements IWebhookRepository {
   /**
    * Maps database row to WebhookDelivery object
    */
-  private mapDeliveryToObject(row: unknown): WebhookDelivery {
+  private mapDeliveryToObject(row: WebhookDeliveryRow): WebhookDelivery {
     return {
       id: row.id,
       webhookId: row.webhookId,
       eventType: row.eventType,
-      payload: row.payload,
-      status: row.status,
-      httpStatusCode: row.httpStatusCode,
-      responseBody: row.responseBody,
+      payload: row.payload as Record<string, unknown>,
+      status: row.status as 'pending' | 'success' | 'failure',
+      httpStatusCode: row.httpStatusCode ?? null,
+      responseBody: row.responseBody ?? null,
       attemptCount: row.attemptCount,
-      nextRetryAt: row.nextRetryAt,
-      deliveredAt: row.deliveredAt,
+      nextRetryAt: row.nextRetryAt ?? null,
+      deliveredAt: row.deliveredAt ?? null,
       createdAt: row.createdAt,
     };
   }

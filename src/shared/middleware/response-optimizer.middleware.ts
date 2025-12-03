@@ -31,32 +31,7 @@ function filterFields<T extends Record<string, unknown>>(obj: T, fields: string[
   for (const field of fields) {
     // Support nested fields with dot notation (e.g., "user.name")
     if (field.includes('.')) {
-      const parts = field.split('.');
-      const rootField = parts[0] as keyof T;
-      const part = parts[1];
-
-      if (rootField in obj && part !== undefined) {
-        if (!filtered[rootField]) {
-          filtered[rootField] = {} as T[keyof T];
-        }
-
-        // Handle nested field
-        const current = obj[rootField];
-        const target = filtered[rootField];
-
-        if (
-          current &&
-          typeof current === 'object' &&
-          !Array.isArray(current) &&
-          typeof target === 'object' &&
-          !Array.isArray(target) &&
-          part in current
-        ) {
-          const nestedCurrent = current as Record<string, unknown>;
-          const nestedTarget = target as Record<string, unknown>;
-          nestedTarget[part] = nestedCurrent[part];
-        }
-      }
+      processNestedField(obj, filtered, field);
     } else {
       // Simple field
       const key = field as keyof T;
@@ -67,6 +42,43 @@ function filterFields<T extends Record<string, unknown>>(obj: T, fields: string[
   }
 
   return filtered;
+}
+
+/**
+ * Process nested field with dot notation
+ */
+function processNestedField<T extends Record<string, unknown>>(
+  obj: T,
+  filtered: Partial<T>,
+  field: string
+): void {
+  const parts = field.split('.');
+  const rootField = parts[0] as keyof T;
+  const part = parts[1];
+
+  if (!(rootField in obj) || part === undefined) {
+    return;
+  }
+
+  if (!filtered[rootField]) {
+    filtered[rootField] = {} as T[keyof T];
+  }
+
+  const current = obj[rootField];
+  const target = filtered[rootField];
+
+  if (
+    current &&
+    typeof current === 'object' &&
+    !Array.isArray(current) &&
+    typeof target === 'object' &&
+    !Array.isArray(target) &&
+    part in current
+  ) {
+    const nestedCurrent = current as Record<string, unknown>;
+    const nestedTarget = target as Record<string, unknown>;
+    nestedTarget[part] = nestedCurrent[part];
+  }
 }
 
 /**

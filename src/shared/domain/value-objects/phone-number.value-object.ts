@@ -1,4 +1,4 @@
-import { ValidationError } from '../../core/errors/types/application-error.js';
+import { ValidationError } from '../../errors/types/application-error.js';
 
 /**
  * PhoneNumber value object representing a validated E.164 format phone number.

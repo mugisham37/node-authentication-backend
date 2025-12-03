@@ -6,37 +6,38 @@ import type {
   SecurityAlertEmailInput,
   WelcomeEmailInput,
 } from '../application/services/email.service.js';
-import { NodemailerProvider } from '../../core/mail/providers/nodemailer-provider.js';
-import { TemplateRenderer } from '../../core/mail/providers/template-renderer.js';
-import { EmailQueue } from '../../core/queue/email-queue.js';
+import { NodemailerProvider } from '../mail/providers/nodemailer-provider.js';
+import { TemplateRenderer } from '../mail/providers/template-renderer.js';
+import { EmailQueue } from '../queue/email-queue.js';
 import { logger } from '../logging/logger.js';
 
 export class EmailService implements IEmailService {
   private nodemailerProvider: NodemailerProvider;
   private templateRenderer: TemplateRenderer;
-  private emailQueue: EmailQueue;
-  private useQueue: boolean;
+  private emailQueue!: EmailQueue;
 
   constructor(
     nodemailerProvider: NodemailerProvider,
     templateRenderer: TemplateRenderer,
-    emailQueue: EmailQueue,
-    useQueue: boolean = true
+    emailQueue: EmailQueue | null
   ) {
     this.nodemailerProvider = nodemailerProvider;
     this.templateRenderer = templateRenderer;
-    this.emailQueue = emailQueue;
-    this.useQueue = useQueue;
+    if (emailQueue) {
+      this.emailQueue = emailQueue;
+    }
 
-    logger.info('Email service initialized', { useQueue });
+    logger.info('Email service initialized');
+  }
+
+  setEmailQueue(emailQueue: EmailQueue): void {
+    this.emailQueue = emailQueue;
   }
 
   async sendEmail(input: SendEmailInput): Promise<void> {
-    if (this.useQueue) {
-      await this.emailQueue.addEmailJob(input);
-    } else {
-      await this.nodemailerProvider.sendEmail(input);
-    }
+    // For generic sendEmail, always send directly via nodemailer
+    // Specific email types (verification, password reset, etc.) use their own queue methods
+    await this.nodemailerProvider.sendEmail(input);
   }
 
   async sendVerificationEmail(input: VerificationEmailInput): Promise<void> {

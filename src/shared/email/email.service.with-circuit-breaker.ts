@@ -6,7 +6,7 @@ import type {
   SecurityAlertEmailInput,
   WelcomeEmailInput,
 } from '../application/services/email.service.js';
-import { CircuitBreaker } from '../../core/resilience/circuit-breaker.js';
+import { CircuitBreaker } from '../resilience/circuit-breaker.js';
 import { logger } from '../logging/logger.js';
 
 /**
@@ -46,7 +46,13 @@ export class EmailServiceWithCircuitBreaker implements IEmailService {
     return this.circuitBreaker.execute(() => this.emailService.sendWelcomeEmail(input));
   }
 
-  getCircuitBreakerMetrics() {
+  getCircuitBreakerMetrics(): {
+    state: string;
+    failureCount: number;
+    successCount: number;
+    lastFailureTime: number | null;
+    nextAttemptTime: number | null;
+  } {
     return this.circuitBreaker.getMetrics();
   }
 }

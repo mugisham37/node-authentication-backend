@@ -81,8 +81,12 @@ export async function withCorrelationIdAsync<T>(
 
 export function setUserContext(userId?: string, email?: string): void {
   const context = userContextStorage.getStore() || {};
-  if (userId) context.userId = userId;
-  if (email) context.email = email;
+  if (userId) {
+    context.userId = userId;
+  }
+  if (email) {
+    context.email = email;
+  }
 }
 
 export function withUserContext<T>(userId: string, email: string, fn: () => T): T {
@@ -104,8 +108,12 @@ export async function withUserContextAsync<T>(
 const sampleCounters = new Map<string, number>();
 
 function shouldSample(key: string, sampleRate: number): boolean {
-  if (sampleRate >= 1) return true;
-  if (sampleRate <= 0) return false;
+  if (sampleRate >= 1) {
+    return true;
+  }
+  if (sampleRate <= 0) {
+    return false;
+  }
 
   const count = (sampleCounters.get(key) || 0) + 1;
   sampleCounters.set(key, count);

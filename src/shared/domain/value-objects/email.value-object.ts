@@ -1,4 +1,4 @@
-import { ValidationError } from '../../core/errors/types/application-error.js';
+import { ValidationError } from '../../errors/types/application-error.js';
 
 /**
  * Email value object representing a validated email address.

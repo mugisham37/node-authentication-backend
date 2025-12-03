@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { getDatabase } from './connections/postgres.js';
 import { CacheService } from '../cache/cache.service.js';
 import { log } from '../logging/logger.js';
@@ -40,16 +41,14 @@ export class QueryOptimizer {
    * Analyze query performance using EXPLAIN ANALYZE
    * Requirement: 19.2
    */
-  static async analyzeQuery(query: string, params?: unknown[]): Promise<void> {
+  static async analyzeQuery(query: string, _params?: unknown[]): Promise<void> {
     try {
       const db = getDatabase();
-      const explainQuery = `EXPLAIN ANALYZE ${query}`;
 
       log.info('Analyzing query performance', { query });
 
-      // Execute EXPLAIN ANALYZE
-      // Note: This is a simplified version - actual implementation would need proper typing
-      const result = await (db as any).execute(explainQuery, params);
+      // Execute EXPLAIN ANALYZE using sql template literal
+      const result = await db.execute(sql.raw(`EXPLAIN ANALYZE ${query}`));
 
       log.info('Query analysis complete', {
         query,
@@ -136,11 +135,7 @@ export class QueryOptimizer {
    * Uses batch inserts for better performance
    * Requirement: 19.1
    */
-  static async bulkInsert<T>(
-    tableName: string,
-    records: T[],
-    batchSize: number = 100
-  ): Promise<void> {
+  static bulkInsert<T>(tableName: string, records: T[], batchSize: number = 100): void {
     if (records.length === 0) {
       return;
     }
@@ -223,7 +218,7 @@ export class QueryOptimizer {
    * Prefetch related data to avoid N+1 queries
    * Requirement: 19.2
    */
-  static async prefetchRelations<T>(
+  static async prefetchRelations<T extends Record<string, unknown>>(
     entities: T[],
     relations: Array<{
       field: string;
@@ -239,15 +234,16 @@ export class QueryOptimizer {
 
     // Attach relations to entities
     return entities.map((entity) => {
-      const enriched = { ...entity };
+      const enriched: Record<string, unknown> = { ...entity };
 
       relations.forEach((relation, index) => {
         const relationMap = relationMaps[index];
-        const entityId = (entity as any).id;
-        (enriched as any)[relation.field] = relationMap.get(entityId);
+        if (relationMap && 'id' in entity && typeof entity['id'] === 'string') {
+          enriched[relation.field] = relationMap.get(entity['id']);
+        }
       });
 
-      return enriched;
+      return enriched as T;
     });
   }
 }

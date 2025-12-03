@@ -1,4 +1,4 @@
-import { ValidationError } from '../../core/errors/types/application-error.js';
+import { ValidationError } from '../../errors/types/application-error.js';
 
 /**
  * IPAddress value object representing a validated IPv4 or IPv6 address.
