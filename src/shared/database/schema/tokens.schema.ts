@@ -1,5 +1,5 @@
 import { pgTable, uuid, varchar, timestamp, inet } from 'drizzle-orm/pg-core';
-import { users } from './users.schema.js';
+import { users } from './users.schema';
 
 export const passwordResetTokens = pgTable('password_reset_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),

@@ -39,7 +39,7 @@ export const rolePermissions = pgTable('role_permissions', {
 });
 
 // Import users for foreign key reference
-import { users } from './users.schema.js';
+import { users } from './users.schema';
 
 export type Role = typeof roles.$inferSelect;
 export type NewRole = typeof roles.$inferInsert;

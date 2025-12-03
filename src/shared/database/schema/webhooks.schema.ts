@@ -8,7 +8,7 @@ import {
   integer,
   text,
 } from 'drizzle-orm/pg-core';
-import { users } from './users.schema.js';
+import { users } from './users.schema';
 
 export const webhooks = pgTable('webhooks', {
   id: uuid('id').primaryKey().defaultRandom(),

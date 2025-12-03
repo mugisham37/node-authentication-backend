@@ -1,21 +1,21 @@
 // Base event classes
-export * from './domain-event.js';
-export * from './event-emitter.js';
+export * from './domain-event';
+export * from './event-emitter';
 
 // User events
-export * from './user-events.js';
+export * from './user-events';
 
 // MFA events
-export * from './mfa-events.js';
+export * from './mfa-events';
 
 // Session events
-export * from './session-events.js';
+export * from './session-events';
 
 // Role events
-export * from './role-events.js';
+export * from './role-events';
 
 // Device events
-export * from './device-events.js';
+export * from './device-events';
 
 // Webhook events
-export * from './webhook-events.js';
+export * from './webhook-events';

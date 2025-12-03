@@ -6,16 +6,16 @@ import type { EmailServiceConfig } from './email.factory.js';
  */
 export const emailConfigExample: EmailServiceConfig = {
   nodemailer: {
-    host: process.env.SMTP_HOST || 'smtp.example.com',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+    host: process.env['SMTP_HOST'] || 'smtp.example.com',
+    port: parseInt(process.env['SMTP_PORT'] || '587', 10),
+    secure: process.env['SMTP_SECURE'] === 'true', // true for 465, false for other ports
     auth: {
-      user: process.env.SMTP_USER || 'your-email@example.com',
-      pass: process.env.SMTP_PASS || 'your-password',
+      user: process.env['SMTP_USER'] || 'your-email@example.com',
+      pass: process.env['SMTP_PASS'] || 'your-password',
     },
-    from: process.env.SMTP_FROM || '"Enterprise Auth" <noreply@example.com>',
+    from: process.env['SMTP_FROM'] || '"Enterprise Auth" <noreply@example.com>',
   },
-  useQueue: process.env.EMAIL_USE_QUEUE !== 'false', // Default to true
+  useQueue: process.env['EMAIL_USE_QUEUE'] !== 'false', // Default to true
 };
 
 /**
