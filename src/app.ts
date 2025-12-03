@@ -7,9 +7,9 @@ import compress from '@fastify/compress';
 import etag from '@fastify/etag';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import { env } from './shared/config/env.js';
-import { swaggerConfig, swaggerUiConfig } from './shared/config/swagger.config.js';
-import { logger } from './shared/logging/logger.js';
+import { env } from './infrastructure/config/env.js';
+import { swaggerConfig, swaggerUiConfig } from './infrastructure/config/swagger.config.js';
+import { logger } from './infrastructure/logging/logger.js';
 import { ApplicationError } from './core/errors/types/application-error.js';
 import { randomUUID } from 'crypto';
 
@@ -349,7 +349,7 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
  */
 async function initializeNotificationSystem(): Promise<void> {
   const { setupNotificationEventListeners } =
-    await import('./shared/application/services/notification-event-listeners.js');
+    await import('./application/services/notification-event-listeners.js');
   setupNotificationEventListeners();
   logger.info('Notification system initialized');
 }

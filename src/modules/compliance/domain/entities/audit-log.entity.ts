@@ -1,4 +1,4 @@
-import { IPAddress } from '../../../../shared/domain/value-objects/ip-address.value-object.js';
+import { IPAddress } from '../../../../domain/value-objects/ip-address.value-object.js';
 
 /**
  * AuditLog entity representing an immutable record of security-relevant events.

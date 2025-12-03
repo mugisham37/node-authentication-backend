@@ -1,7 +1,7 @@
 import { Redis } from 'ioredis';
 import { WebhookDeliveryService } from './webhook-delivery.service.impl.js';
-import { WebhookQueue } from '../queue/webhook-queue.js';
-import { logger } from '../logging/logger.js';
+import { WebhookQueue } from '../../infrastructure/queue/webhook-queue.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export class WebhookDeliveryServiceFactory {
   static create(redisConnection: Redis): WebhookDeliveryService {

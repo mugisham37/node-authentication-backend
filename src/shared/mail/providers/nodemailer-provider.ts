@@ -1,6 +1,6 @@
 import nodemailer, { Transporter } from 'nodemailer';
-import type { SendEmailInput } from '../../../shared/application/services/email.service.js';
-import { logger } from '../../../shared/logging/logger.js';
+import type { SendEmailInput } from '../../../application/services/email.service.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 export interface NodemailerConfig {
   host: string;

@@ -1,6 +1,6 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ApplicationError } from '../types/application-error.js';
-import { log } from '../../logging/logger.js';
+import { log } from '../../../infrastructure/logging/logger.js';
 
 interface RequestWithUser extends FastifyRequest {
   user?: { id: string };

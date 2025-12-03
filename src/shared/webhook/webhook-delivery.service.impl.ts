@@ -2,9 +2,9 @@ import type {
   IWebhookDeliveryService,
   WebhookEvent,
   WebhookDeliveryResult,
-} from '../application/services/webhook-delivery.service.js';
-import { WebhookQueue } from '../queue/webhook-queue.js';
-import { logger } from '../logging/logger.js';
+} from '../../application/services/webhook-delivery.service.js';
+import { WebhookQueue } from '../../infrastructure/queue/webhook-queue.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 import { HmacService } from '../security/hashing/hmac.service.js';
 
 export class WebhookDeliveryService implements IWebhookDeliveryService {

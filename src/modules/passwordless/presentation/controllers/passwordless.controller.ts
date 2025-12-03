@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../../../shared/container/container.js';
+import { container } from '../../../../infrastructure/container/container.js';
 import { IPasswordlessService } from '../../application/services/passwordless.service.js';
 import {
   validateRequest,
