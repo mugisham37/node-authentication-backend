@@ -1280,6 +1280,8 @@
 
 
 
+
+
   - Create BaseController with common methods
   - Extract route logic into dedicated controllers
   - Implement dependency injection for controllers
@@ -1311,7 +1313,8 @@
 
 
 
-- [ ] 25.3 Create OAuth controller
+- [x] 25.3 Create OAuth controller
+
   - Implement OAuthController extending BaseController
   - Move OAuth authorization logic from route to controller
   - Move OAuth callback logic from route to controller
@@ -1330,7 +1333,8 @@
 
 
 
-- [ ] 25.5 Create device controller
+- [x] 25.5 Create device controller
+
   - Implement DeviceController extending BaseController
   - Move device list logic from route to controller
   - Move device trust logic from route to controller
@@ -1339,7 +1343,8 @@
 
 
 
-- [ ] 25.6 Create user controller
+- [x] 25.6 Create user controller
+
   - Implement UserController extending BaseController
   - Move profile get logic from route to controller
 
@@ -1349,13 +1354,15 @@
   - Move account deletion logic from route to controller
   - _Requirements: Various user management requirements_
 
+
 - [ ] 25.7 Create webhook controller
   - Implement WebhookController extending BaseController
   - Move webhook CRUD logic from routes to controller
   - Move webhook delivery list logic from route to controller
   - _Requirements: 16.1, 16.5, 16.6_
 
-- [ ] 25.8 Implement pagination system
+- [x] 25.8 Implement pagination system
+
   - Create pagination types (PaginationParams, PaginationMeta, PaginatedResponse)
   - Create PaginationHelper utility class
   - Implement validateParams method
@@ -1366,7 +1373,8 @@
   - Implement cursor encoding/decoding methods
   - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6_
 
-- [ ] 25.9 Add pagination to repositories
+- [-] 25.9 Add pagination to repositories
+
   - Update UserRepository with findPaginated method
   - Update AuditLogRepository with findPaginated method
   - Update SessionRepository with findPaginated method
@@ -1399,7 +1407,8 @@
   - Update WebhookController to use WebhookSerializer
   - _Requirements: 24.1, 24.2, 24.3, 24.4, 24.5, 24.6_
 
-- [ ] 25.12 Update routes to use controllers
+- [-] 25.12 Update routes to use controllers
+
   - Update auth.routes.ts to use AuthController
   - Update mfa.routes.ts to use MFAController
   - Update oauth.routes.ts to use OAuthController

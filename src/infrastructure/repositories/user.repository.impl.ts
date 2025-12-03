@@ -1,6 +1,10 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, like, count, desc, asc, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
+import {
+  IUserRepository,
+  UserPaginationOptions,
+  PaginatedUsers,
+} from '../../domain/repositories/user.repository.interface.js';
 import { User } from '../../domain/entities/user.entity.js';
 import { Email } from '../../domain/value-objects/email.value-object.js';
 import { users, type User as UserRow } from '../database/schema/users.schema.js';
@@ -253,6 +257,70 @@ export class UserRepository implements IUserRepository {
       throw new ServiceUnavailableError('Database', {
         originalError: err.message || 'Unknown error',
         operation: 'delete',
+      });
+    }
+  }
+
+  /**
+   * Find users with pagination and filtering
+   * Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+   */
+  async findPaginated(options: UserPaginationOptions): Promise<PaginatedUsers> {
+    try {
+      // Build where conditions
+      const conditions = [];
+
+      // Filter by email
+      if (options.email) {
+        conditions.push(like(users.email, `%${options.email}%`));
+      }
+
+      // Filter by status
+      if (options.status === 'active') {
+        conditions.push(isNull(users.deletedAt));
+        conditions.push(eq(users.isSuspended, false));
+      } else if (options.status === 'locked') {
+        conditions.push(isNull(users.deletedAt));
+        conditions.push(eq(users.isSuspended, true));
+      } else if (options.status === 'deleted') {
+        conditions.push(sql`${users.deletedAt} IS NOT NULL`);
+      } else {
+        // Default: only active users
+        conditions.push(isNull(users.deletedAt));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      // Get total count
+      const countResult = await this.db
+        .select({ count: count() })
+        .from(users)
+        .where(whereClause);
+
+      const total = countResult[0]?.count ?? 0;
+
+      // Get paginated results
+      const sortColumn = options.sortBy === 'email' ? users.email : users.createdAt;
+      const sortDirection = options.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
+      const result = await this.db
+        .select()
+        .from(users)
+        .where(whereClause)
+        .orderBy(sortDirection)
+        .limit(options.limit)
+        .offset(options.offset);
+
+      const userEntities = result.map((row) => this.mapToEntity(row));
+
+      return {
+        users: userEntities,
+        total: Number(total),
+      };
+    } catch (error) {
+      throw new ServiceUnavailableError('Database', {
+        originalError: (error as Error).message,
+        operation: 'findPaginated',
       });
     }
   }
