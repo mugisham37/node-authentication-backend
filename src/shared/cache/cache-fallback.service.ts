@@ -1,4 +1,4 @@
-import { logger } from '../logging/logger.js';
+import { logger } from '../../core/logging/logger.js';
 import * as redis from './redis.js';
 
 /**

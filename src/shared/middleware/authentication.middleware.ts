@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
-import { env } from '../../config/env.js';
+import { env } from '../config/env.js';
 import { AuthenticationError } from '../../core/errors/types/application-error.js';
 import { userContextStorage } from '../../core/logging/logger.js';
 

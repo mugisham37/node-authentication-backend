@@ -1,5 +1,5 @@
 import { CacheService } from './cache.service.js';
-import { log } from '../logging/logger.js';
+import { log } from '../../core/logging/logger.js';
 
 /**
  * Cache warming service for preloading frequently accessed data

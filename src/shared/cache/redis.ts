@@ -1,7 +1,7 @@
 import Redis, { Redis as RedisClient, Cluster } from 'ioredis';
 import { redisConfig } from '../database/config.js';
-import { log } from '../logging/logger.js';
-import { cacheOperations } from '../monitoring/metrics.js';
+import { log } from '../../core/logging/logger.js';
+import { cacheOperations } from '../../core/monitoring/metrics.js';
 
 let redis: RedisClient | Cluster | null = null;
 let cacheHits = 0;

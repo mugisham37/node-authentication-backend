@@ -4,14 +4,14 @@ import { IWebhookService } from '../../application/services/webhook.service.js';
 import {
   authenticationMiddleware,
   AuthenticatedRequest,
-} from '../middleware/authentication.middleware.js';
+} from '../../../../shared/middleware/authentication.middleware.js';
 import {
   validateRequest,
   idParamSchema,
   createWebhookBodySchema,
   updateWebhookBodySchema,
   paginationQuerySchema,
-} from '../middleware/validation.middleware.js';
+} from '../../../../shared/middleware/validation.middleware.js';
 
 /**
  * Register webhook routes

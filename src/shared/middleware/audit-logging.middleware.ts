@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../core/container/container.js';
+import { container } from '../container/container.js';
 import { IAuditLogService } from '../../application/services/audit-log.service.js';
 import { log } from '../../core/logging/logger.js';
 

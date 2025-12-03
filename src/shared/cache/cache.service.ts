@@ -1,5 +1,5 @@
 import * as redis from './redis.js';
-import { log } from '../logging/logger.js';
+import { log } from '../../core/logging/logger.js';
 
 /**
  * Cache service for managing application-level caching

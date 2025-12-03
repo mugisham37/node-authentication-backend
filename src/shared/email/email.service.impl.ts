@@ -5,7 +5,7 @@ import type {
   PasswordResetEmailInput,
   SecurityAlertEmailInput,
   WelcomeEmailInput,
-} from '../../shared/application/services/email.service.js';
+} from '../application/services/email.service.js';
 import { NodemailerProvider } from '../../core/mail/providers/nodemailer-provider.js';
 import { TemplateRenderer } from '../../core/mail/providers/template-renderer.js';
 import { EmailQueue } from '../../core/queue/email-queue.js';

@@ -14,7 +14,7 @@ import {
 } from '../jobs/cleanup-jobs.js';
 import type { ISessionRepository } from '../../../domain/repositories/session.repository.js';
 import type { IDeviceRepository } from '../../../domain/repositories/device.repository.js';
-import { getRedis } from '../../cache/redis.js';
+import { getRedis } from '../../../shared/cache/redis.js';
 
 export interface CleanupResult {
   deletedCount: number;
