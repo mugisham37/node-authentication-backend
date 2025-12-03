@@ -1,5 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { log } from '../../core/logging/logger.js';
+import { log } from '../logging/logger.js';
 
 /**
  * Response optimization middleware

@@ -5,7 +5,7 @@ import { MFAEnabledEvent, MFADisabledEvent } from '../../domain/events/mfa-event
 import { SessionRevokedEvent, SessionCreatedEvent } from '../../domain/events/session-events.js';
 import { AccountLockedEvent, AccountUnlockedEvent } from '../../domain/events/user-events.js';
 import { notificationService } from './notification.service.js';
-import { logger } from '../../../core/logging/logger.js';
+import { logger } from '../../logging/logger.js';
 
 /**
  * Sets up event listeners for domain events to trigger real-time notifications

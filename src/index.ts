@@ -1,5 +1,5 @@
 import { buildApp, startServer, gracefulShutdown } from './app.js';
-import { logger } from './core/logging/logger.js';
+import { logger } from './shared/logging/logger.js';
 import { initializeTracing, shutdownTracing } from './core/monitoring/tracing.js';
 
 async function main() {

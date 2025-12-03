@@ -6,7 +6,7 @@
 
 import { Job } from 'bullmq';
 import crypto from 'crypto';
-import { logger } from '../../logging/logger.js';
+import { logger } from '../../../shared/logging/logger.js';
 import { WebhookJobData } from '../jobs/webhook-jobs.js';
 
 export interface WebhookDeliveryResult {

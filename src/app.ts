@@ -9,7 +9,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import { env } from './shared/config/env.js';
 import { swaggerConfig, swaggerUiConfig } from './shared/config/swagger.config.js';
-import { logger } from './core/logging/logger.js';
+import { logger } from './shared/logging/logger.js';
 import { ApplicationError } from './core/errors/types/application-error.js';
 import { randomUUID } from 'crypto';
 

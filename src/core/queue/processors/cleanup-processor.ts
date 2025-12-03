@@ -5,7 +5,7 @@
  */
 
 import { Job } from 'bullmq';
-import { logger } from '../../logging/logger.js';
+import { logger } from '../../../shared/logging/logger.js';
 import {
   SessionCleanupJobData,
   TokenCleanupJobData,

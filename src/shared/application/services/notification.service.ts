@@ -1,5 +1,5 @@
 import { connectionManager } from '../../presentation/websocket/connection-manager.js';
-import { logger } from '../../../core/logging/logger.js';
+import { logger } from '../../logging/logger.js';
 
 /**
  * Notification types for real-time events

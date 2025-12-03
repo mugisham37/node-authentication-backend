@@ -5,7 +5,7 @@
  */
 
 import { Redis } from 'ioredis';
-import { logger } from '../logging/logger.js';
+import { logger } from '../../shared/logging/logger.js';
 import { EmailQueue } from './email-queue.js';
 import { WebhookQueue } from './webhook-queue.js';
 import { AuditLogQueue } from './audit-log-queue.js';

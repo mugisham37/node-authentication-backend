@@ -7,7 +7,7 @@ import type {
   WelcomeEmailInput,
 } from '../application/services/email.service.js';
 import { CircuitBreaker } from '../../core/resilience/circuit-breaker.js';
-import { logger } from '../../core/logging/logger.js';
+import { logger } from '../logging/logger.js';
 
 /**
  * Email service wrapper with circuit breaker protection

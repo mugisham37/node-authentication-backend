@@ -9,7 +9,7 @@ import type {
 import { NodemailerProvider } from '../../core/mail/providers/nodemailer-provider.js';
 import { TemplateRenderer } from '../../core/mail/providers/template-renderer.js';
 import { EmailQueue } from '../../core/queue/email-queue.js';
-import { logger } from '../../core/logging/logger.js';
+import { logger } from '../logging/logger.js';
 
 export class EmailService implements IEmailService {
   private nodemailerProvider: NodemailerProvider;

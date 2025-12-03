@@ -6,7 +6,7 @@
 
 import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
-import { logger } from '../logging/logger.js';
+import { logger } from '../../shared/logging/logger.js';
 import {
   CLEANUP_JOB_TYPES,
   SessionCleanupJobData,

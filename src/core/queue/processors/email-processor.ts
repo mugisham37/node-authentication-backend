@@ -5,7 +5,7 @@
  */
 
 import { Job } from 'bullmq';
-import { logger } from '../../logging/logger.js';
+import { logger } from '../../../shared/logging/logger.js';
 import type { IEmailService } from '../../../shared/application/services/email.service.js';
 import {
   EMAIL_JOB_TYPES,
