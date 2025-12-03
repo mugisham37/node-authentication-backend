@@ -63,4 +63,9 @@ export interface IUserRepository {
    * Delete a user by ID (soft delete)
    */
   delete(id: string): Promise<void>;
+
+  /**
+   * Find all users (for admin operations)
+   */
+  findAll(): Promise<User[]>;
 }

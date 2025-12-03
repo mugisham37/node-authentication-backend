@@ -1,10 +1,7 @@
-import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyInstance } from 'fastify';
 import { container } from '../../../../infrastructure/container/container.js';
-import {
-  IAuthenticationService,
-  RegisterOutput,
-  LoginOutput,
-} from '../../../../application/services/authentication.service.js';
+import { IAuthenticationService } from '../../../../application/services/authentication.service.js';
+import { AuthController } from '../controllers/auth.controller.js';
 import {
   validateRequest,
   registerBodySchema,
@@ -14,10 +11,7 @@ import {
   forgotPasswordBodySchema,
   resetPasswordBodySchema,
 } from '../../../../infrastructure/middleware/validation.middleware.js';
-import {
-  authenticationMiddleware,
-  AuthenticatedRequest,
-} from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { authenticationMiddleware } from '../../../../infrastructure/middleware/authentication.middleware.js';
 import {
   registrationRateLimiter,
   authenticationRateLimiter,
@@ -46,9 +40,9 @@ import {
 /**
  * Register authentication routes
  */
-/* eslint-disable max-lines-per-function, @typescript-eslint/require-await */
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const authService = container.resolve<IAuthenticationService>('authenticationService');
+  const authController = new AuthController(authService);
 
   /**
    * POST /api/v1/auth/register
@@ -73,41 +67,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [registrationRateLimiter, validateRequest({ body: registerBodySchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { email, password, name, image } = request.body as {
-        email: string;
-        password: string;
-        name: string;
-        image?: string;
-      };
-
-      const result: RegisterOutput = await authService.register({
-        email,
-        password,
-        name,
-        image,
-      });
-
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-      const responseUser = {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
-        image: result.user.image,
-        emailVerified: result.user.emailVerified,
-      };
-      const responseAccessToken = result.accessToken;
-      const responseRefreshToken = result.refreshToken;
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
-
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-      return reply.status(201).send({
-        user: responseUser,
-        accessToken: responseAccessToken,
-        refreshToken: responseRefreshToken,
-      });
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
-    }
+    async (request, reply) => authController.register(request, reply)
   );
 
   /**
@@ -133,72 +93,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [authenticationRateLimiter, validateRequest({ body: loginBodySchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { email, password } = request.body as {
-        email: string;
-        password: string;
-      };
-
-      const userAgent = request.headers['user-agent'] || 'Unknown';
-      // Extract device name from user agent (simplified)
-      const deviceName = userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop';
-
-      const result: LoginOutput = await authService.login({
-        email,
-        password,
-        deviceName,
-        ipAddress: request.ip,
-        userAgent: userAgent,
-      });
-
-      // If MFA is enabled, return challenge instead of tokens
-      if ('challengeId' in result && result.mfaChallengeId) {
-        return reply.status(200).send({
-          mfaRequired: true,
-          challengeId: result.mfaChallengeId,
-        });
-      }
-
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-      // Extract values with explicit typing
-      const responseUser = {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
-        image: result.user.image,
-        emailVerified: result.user.emailVerified,
-        mfaEnabled: result.user.mfaEnabled,
-      };
-      const responseAccessToken = result.accessToken || '';
-      const responseRefreshToken = result.refreshToken || '';
-
-      // Return successful login with tokens
-      const response: {
-        user: typeof responseUser;
-        accessToken: string;
-        refreshToken: string;
-        session?: {
-          id: string;
-          deviceName: string;
-          trustScore: number;
-        };
-      } = {
-        user: responseUser,
-        accessToken: responseAccessToken,
-        refreshToken: responseRefreshToken,
-      };
-
-      if (result.session) {
-        response.session = {
-          id: result.session.id,
-          deviceName: result.session.deviceName,
-          trustScore: result.session.trustScore,
-        };
-      }
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
-
-      return reply.status(200).send(response);
-    }
+    async (request, reply) => authController.login(request, reply)
   );
 
   /**
@@ -219,18 +114,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [authenticationMiddleware],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const authRequest = request as AuthenticatedRequest;
-      const sessionId = authRequest.user.sessionId;
-
-      if (sessionId) {
-        await authService.logout(sessionId);
-      }
-
-      return reply.status(200).send({
-        message: 'Logged out successfully',
-      });
-    }
+    async (request, reply) => authController.logout(request, reply)
   );
 
   /**
@@ -252,22 +136,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [validateRequest({ body: refreshTokenBodySchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { refreshToken } = request.body as { refreshToken: string };
-
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-      const tokens = await authService.refreshTokens(refreshToken);
-      const responseAccessToken = tokens.accessToken;
-      const responseRefreshToken = tokens.refreshToken;
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-
-      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-      return reply.status(200).send({
-        accessToken: responseAccessToken,
-        refreshToken: responseRefreshToken,
-      });
-      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
-    }
+    async (request, reply) => authController.refreshToken(request, reply)
   );
 
   /**
@@ -288,15 +157,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [validateRequest({ body: verifyEmailBodySchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { token } = request.body as { token: string };
-
-      await authService.verifyEmail({ token });
-
-      return reply.status(200).send({
-        message: 'Email verified successfully',
-      });
-    }
+    async (request, reply) => authController.verifyEmail(request, reply)
   );
 
   /**
@@ -318,16 +179,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [passwordResetRateLimiter, validateRequest({ body: forgotPasswordBodySchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { email } = request.body as { email: string };
-
-      await authService.requestPasswordReset({ email });
-
-      // Always return success to prevent email enumeration
-      return reply.status(200).send({
-        message: 'If the email exists, a password reset link has been sent',
-      });
-    }
+    async (request, reply) => authController.forgotPassword(request, reply)
   );
 
   /**
@@ -350,18 +202,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [passwordResetRateLimiter, validateRequest({ body: resetPasswordBodySchema })],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const { token, password } = request.body as {
-        token: string;
-        password: string;
-      };
-
-      await authService.resetPassword({ token, newPassword: password });
-
-      return reply.status(200).send({
-        message: 'Password reset successfully',
-      });
-    }
+    async (request, reply) => authController.resetPassword(request, reply)
   );
 
   /**
@@ -382,19 +223,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       },
       preHandler: [authenticationMiddleware],
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
-      const authRequest = request as AuthenticatedRequest;
-      const userId = authRequest.user.userId;
-
-      // Get user from service or repository
-      // For now, return the user from token
-      return reply.status(200).send({
-        user: {
-          id: userId,
-          email: authRequest.user.email,
-          roles: authRequest.user.roles || [],
-        },
-      });
-    }
+    async (request, reply) => authController.getCurrentUser(request, reply)
   );
 }

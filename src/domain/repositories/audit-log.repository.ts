@@ -7,6 +7,7 @@ import { AuditLog } from '../entities/audit-log.entity.js';
 export interface AuditLogFilters {
   userId?: string;
   action?: string;
+  actions?: string[];
   resource?: string;
   status?: 'success' | 'failure' | 'pending';
   minRiskScore?: number;

@@ -292,10 +292,7 @@ export class UserRepository implements IUserRepository {
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       // Get total count
-      const countResult = await this.db
-        .select({ count: count() })
-        .from(users)
-        .where(whereClause);
+      const countResult = await this.db.select({ count: count() }).from(users).where(whereClause);
 
       const total = countResult[0]?.count ?? 0;
 

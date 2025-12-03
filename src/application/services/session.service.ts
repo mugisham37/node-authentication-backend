@@ -125,6 +125,17 @@ export interface ISessionService {
    * Requirements: 7.6
    */
   reduceTrustScoreForNewLocation(sessionId: string): Promise<void>;
+
+  /**
+   * List all sessions across all users (admin only)
+   * Requirements: 26.10
+   */
+  listAllSessions(params: {
+    page: number;
+    limit: number;
+    userId?: string;
+    deviceName?: string;
+  }): Promise<{ sessions: SessionOutput[]; total: number }>;
 }
 
 /**
@@ -481,5 +492,59 @@ export class SessionService implements ISessionService {
       sessionId,
       newTrustScore: session.trustScore,
     });
+  }
+
+  /**
+   * List all sessions across all users (admin only)
+   * Requirements: 26.10
+   */
+  async listAllSessions(params: {
+    page: number;
+    limit: number;
+    userId?: string;
+    deviceName?: string;
+  }): Promise<{ sessions: SessionOutput[]; total: number }> {
+    // Get all sessions
+    const allSessions = await this.sessionRepository.findAll();
+
+    // Apply filters
+    let filteredSessions = allSessions.filter(
+      (session) => !session.isExpired() && !session.isRevoked()
+    );
+
+    if (params.userId) {
+      filteredSessions = filteredSessions.filter((session) => session.userId === params.userId);
+    }
+
+    if (params.deviceName) {
+      filteredSessions = filteredSessions.filter((session) =>
+        session.deviceName.toLowerCase().includes(params.deviceName!.toLowerCase())
+      );
+    }
+
+    // Calculate pagination
+    const total = filteredSessions.length;
+    const offset = (params.page - 1) * params.limit;
+    const paginatedSessions = filteredSessions.slice(offset, offset + params.limit);
+
+    // Map to output format
+    const sessionOutputs: SessionOutput[] = paginatedSessions.map((session) => ({
+      id: session.id,
+      deviceName: session.deviceName,
+      deviceFingerprint: session.deviceFingerprint.toString(),
+      ipAddress: session.ipAddress.toString(),
+      userAgent: session.userAgent,
+      location: session.location,
+      isTrusted: session.isTrusted,
+      trustScore: session.trustScore,
+      lastActivityAt: session.lastActivityAt,
+      expiresAt: session.expiresAt,
+      createdAt: session.createdAt,
+    }));
+
+    return {
+      sessions: sessionOutputs,
+      total,
+    };
   }
 }

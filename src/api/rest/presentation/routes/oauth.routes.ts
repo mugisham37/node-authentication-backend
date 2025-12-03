@@ -28,9 +28,11 @@ export function oauthRoutes(app: FastifyInstance): void {
    * GET /api/v1/oauth/:provider/callback
    * Handle OAuth callback
    */
-  app.get<{ Params: { provider: string }; Querystring: { code: string; state: string; code_verifier?: string } }>(
-    '/api/v1/oauth/:provider/callback',
-    async (request, reply) => oauthController.callback(request, reply)
+  app.get<{
+    Params: { provider: string };
+    Querystring: { code: string; state: string; code_verifier?: string };
+  }>('/api/v1/oauth/:provider/callback', async (request, reply) =>
+    oauthController.callback(request, reply)
   );
 
   /**

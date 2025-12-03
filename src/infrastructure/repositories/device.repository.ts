@@ -282,10 +282,7 @@ export class DeviceRepository implements IDeviceRepository {
       const whereClause = conditions.length > 0 ? eq(devices.userId, options.userId!) : undefined;
 
       // Get total count
-      const countResult = await this.db
-        .select({ count: count() })
-        .from(devices)
-        .where(whereClause);
+      const countResult = await this.db.select({ count: count() }).from(devices).where(whereClause);
 
       const total = countResult[0]?.count ?? 0;
 

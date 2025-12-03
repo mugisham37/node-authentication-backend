@@ -316,8 +316,7 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
   const { sessionRoutes } = await import('./api/rest/presentation/routes/session.routes.js');
   const { deviceRoutes } = await import('./api/rest/presentation/routes/device.routes.js');
   const { userRoutes } = await import('./api/rest/presentation/routes/user.routes.js');
-  // Admin routes - to be implemented
-  // const { adminRoutes } = await import('./api/rest/presentation/routes/admin.routes.js');
+  const { adminRoutes } = await import('./api/rest/presentation/routes/admin.routes.js');
   const { webhookRoutes } = await import('./api/rest/presentation/routes/webhook.routes.js');
   const { monitoringRoutes } = await import('./api/rest/presentation/routes/monitoring.routes.js');
   const { setupWebSocketRoutes } = await import('./api/rest/websocket/websocket-handler.js');
@@ -330,8 +329,7 @@ async function registerRoutes(app: FastifyInstance): Promise<void> {
   await sessionRoutes(app);
   await deviceRoutes(app);
   await userRoutes(app);
-  // TODO: Implement admin routes
-  // await adminRoutes(app);
+  await adminRoutes(app);
   await webhookRoutes(app);
   await monitoringRoutes(app);
 

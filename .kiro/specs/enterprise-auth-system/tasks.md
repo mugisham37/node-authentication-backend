@@ -1355,7 +1355,9 @@
   - _Requirements: Various user management requirements_
 
 
-- [ ] 25.7 Create webhook controller
+- [x] 25.7 Create webhook controller
+
+
   - Implement WebhookController extending BaseController
   - Move webhook CRUD logic from routes to controller
   - Move webhook delivery list logic from route to controller
@@ -1452,12 +1454,34 @@
 ### High Priority - Required for System Management
 
 - [ ] 26. Create admin controller
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   - Implement AdminController extending BaseController
   - Inject required services (user, role, audit, session, metrics)
   - Inject required serializers
   - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5, 26.6, 26.7, 26.8, 26.9, 26.10_
 
-- [ ] 26.1 Implement admin user management endpoints
+
+- [x] 26.1 Implement admin user management endpoints
+
+
   - Implement listUsers with pagination and filters
   - Implement getUserDetails with related data
   - Implement lockUser with reason and duration
@@ -1467,7 +1491,9 @@
   - Implement deleteUser (soft delete)
   - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5_
 
-- [ ] 26.2 Implement admin role management endpoints
+
+- [x] 26.2 Implement admin role management endpoints
+
   - Implement listRoles with pagination
   - Implement getRoleDetails with user count
   - Implement createRole with permissions
@@ -1475,34 +1501,58 @@
   - Implement deleteRole (prevent system role deletion)
   - _Requirements: 26.8_
 
-- [ ] 26.3 Implement admin permission management endpoints
+
+
+- [x] 26.3 Implement admin permission management endpoints
+
   - Implement listPermissions with pagination
   - Implement createPermission
+
   - _Requirements: 26.8_
 
-- [ ] 26.4 Implement admin audit log endpoints
+
+
+- [x] 26.4 Implement admin audit log endpoints
+
   - Implement listAuditLogs with filters and statistics
+
   - Implement getAuditLogDetails with related logs
   - _Requirements: 26.6_
 
-- [ ] 26.5 Implement admin session management endpoints
+
+
+- [x] 26.5 Implement admin session management endpoints
+
   - Implement listAllSessions with filters and statistics
+
   - Implement revokeSession (any session)
   - Implement revokeUserSessions (all sessions for user)
   - _Requirements: 26.10_
 
-- [ ] 26.6 Implement admin webhook management endpoints
+
+
+
+
+- [x] 26.6 Implement admin webhook management endpoints
+
   - Implement listAllWebhooks with filters
   - Implement listWebhookDeliveries with filters
   - _Requirements: 26.10_
 
-- [ ] 26.7 Implement admin metrics endpoints
+
+
+
+
+- [x] 26.7 Implement admin metrics endpoints
+
   - Implement getSystemMetrics (overview)
   - Implement getUserMetrics (growth over time)
   - Implement getSecurityMetrics (security events)
   - _Requirements: 26.7_
 
-- [ ] 26.8 Create admin routes file
+- [x] 26.8 Create admin routes file
+
+
   - Create admin.routes.ts
   - Register all admin endpoints with proper middleware
   - Apply requireAdmin middleware to all routes
@@ -1510,13 +1560,22 @@
   - Apply audit logging
   - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5, 26.6, 26.7, 26.8, 26.9, 26.10_
 
-- [ ] 26.9 Register admin routes in app.ts
+
+
+
+
+
+- [x] 26.9 Register admin routes in app.ts
+
   - Import adminRoutes
   - Register adminRoutes in registerRoutes function
   - Remove TODO comment
   - _Requirements: All admin requirements_
 
-- [ ] 26.10 Implement admin service methods
+
+
+- [x] 26.10 Implement admin service methods
+
   - Add listUsers to UserService with filters
   - Add lockAccount to UserService
   - Add unlockAccount to UserService
@@ -1525,7 +1584,8 @@
   - Add getSystemOverview to MetricsService
   - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5, 26.6, 26.7_
 
-- [ ] 26.11 Write unit tests for admin controller
+- [x] 26.11 Write unit tests for admin controller
+
   - Test listUsers with various filters
   - Test getUserDetails
   - Test lockUser and unlockUser
@@ -1535,7 +1595,10 @@
   - Test metrics endpoints
   - _Requirements: All admin requirements_
 
-- [ ] 26.12 Write API tests for admin endpoints
+
+
+- [x] 26.12 Write API tests for admin endpoints
+
   - Test admin authentication requirement
   - Test admin authorization (non-admin should be rejected)
   - Test user management endpoints

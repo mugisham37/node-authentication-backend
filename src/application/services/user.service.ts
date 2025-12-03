@@ -15,9 +15,13 @@ export interface IUserService {
     limit: number;
     sortBy?: string;
     sortOrder: 'asc' | 'desc';
+    email?: string;
+    status?: 'active' | 'locked' | 'deleted';
+    role?: string;
   }): Promise<{ users: User[]; total: number }>;
   lockAccount(userId: string): Promise<void>;
   unlockAccount(userId: string): Promise<void>;
+  getUserWithDetails(userId: string): Promise<User>;
 }
 
 /**
@@ -146,16 +150,19 @@ export class UserService implements IUserService {
   }
 
   /**
-   * List users with pagination
+   * List users with pagination and filters
    */
   async listUsers(params: {
     page: number;
     limit: number;
     sortBy?: string;
     sortOrder: 'asc' | 'desc';
+    email?: string;
+    status?: 'active' | 'locked' | 'deleted';
+    role?: string;
   }): Promise<{ users: User[]; total: number }> {
     // This could be cached for frequently accessed pages
-    const cacheKey = `users:list:${params.page}:${params.limit}:${params.sortBy}:${params.sortOrder}`;
+    const cacheKey = `users:list:${params.page}:${params.limit}:${params.sortBy}:${params.sortOrder}:${params.email}:${params.status}:${params.role}`;
 
     const cached = await CacheService.getFrequentData<{ users: User[]; total: number }>(cacheKey);
     if (cached) {
@@ -183,6 +190,17 @@ export class UserService implements IUserService {
     await CacheService.setFrequentData(cacheKey, result, 60);
 
     return result;
+  }
+
+  /**
+   * Get user with full details (for admin)
+   */
+  async getUserWithDetails(userId: string): Promise<User> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('User', { userId });
+    }
+    return user;
   }
 
   /**
