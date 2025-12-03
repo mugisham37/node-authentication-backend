@@ -29,7 +29,7 @@ export class OAuthServiceWithCircuitBreaker implements IOAuthService {
     logger.info('OAuth service with circuit breaker initialized');
   }
 
-  async generateAuthorizationUrl(input: GenerateAuthUrlInput): Promise<GenerateAuthUrlOutput> {
+  generateAuthorizationUrl(input: GenerateAuthUrlInput): GenerateAuthUrlOutput {
     // Authorization URL generation is local, no need for circuit breaker
     return this.oauthService.generateAuthorizationUrl(input);
   }
