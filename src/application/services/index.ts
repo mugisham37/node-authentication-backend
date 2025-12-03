@@ -24,13 +24,10 @@ export {
   type VerifyMFALoginOutput,
 } from './mfa.service.js';
 
-export {
-  TokenService,
-  type ITokenService,
-  type TokenPayload,
-  type TokenPair,
-  type RefreshOutput,
-} from './token.service.js';
+export { TokenService, type ITokenService } from './token.service.js';
+
+// Re-export TokenPair from jwt.service
+export type { TokenPair } from '../../infrastructure/security/tokens/jwt.service.js';
 
 export {
   SessionService,
@@ -52,29 +49,15 @@ export {
 } from './oauth.service.js';
 
 export {
-  PasswordlessService,
   type IPasswordlessService,
-  type RequestMagicLinkInput,
-  type RequestMagicLinkOutput,
-  type VerifyMagicLinkInput,
-  type VerifyMagicLinkOutput,
-  type RegisterWebAuthnCredentialInput,
-  type RegisterWebAuthnCredentialOutput,
-  type AuthenticateWithWebAuthnInput,
-  type AuthenticateWithWebAuthnOutput,
-} from '../modules/passwordless/application/services/passwordless.service.js';
+  type MagicLinkVerificationResult,
+} from './passwordless.service.js';
 
 export { AuthorizationService, type IAuthorizationService } from './authorization.service.js';
 
 export { SystemRolesService } from './system-roles.service.js';
 
-export {
-  AuditLogService,
-  type IAuditLogService,
-  type CreateAuditLogInput,
-  type SecurityAlert,
-  type AuditLogQueryResult,
-} from './audit-log.service.js';
+export { type IAuditLogService, type CreateAuditLogInput } from './audit-log.service.js';
 
 export {
   RiskAssessmentService,
@@ -82,7 +65,7 @@ export {
   type LoginAttempt,
   type RiskAssessment,
   type AlertSeverity,
-} from './risk-assessment.service.js';
+} from './compliance/risk-assessment.service.js';
 
 export {
   DeviceService,

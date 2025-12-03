@@ -6,10 +6,10 @@ import type {
   SecurityAlertEmailInput,
   WelcomeEmailInput,
 } from '../../application/services/email.service.js';
-import { NodemailerProvider } from '../mail/providers/nodemailer-provider.js';
-import { TemplateRenderer } from '../mail/providers/template-renderer.js';
+import { NodemailerProvider } from '../../shared/mail/providers/nodemailer-provider.js';
+import { TemplateRenderer } from '../../shared/mail/providers/template-renderer.js';
 import { EmailQueue } from '../../infrastructure/queue/email-queue.js';
-import { logger } from '../logging/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export class EmailService implements IEmailService {
   private nodemailerProvider: NodemailerProvider;

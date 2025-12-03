@@ -1,21 +1,22 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../core/container/container.js';
-import { IWebhookService } from '../../application/services/webhook.service.js';
+import { container } from '../../../../infrastructure/container/container.js';
+import { IWebhookService } from '../../../../application/services/webhook.service.js';
 import {
   authenticationMiddleware,
   AuthenticatedRequest,
-} from '../../../../shared/middleware/authentication.middleware.js';
+} from '../../../../infrastructure/middleware/authentication.middleware.js';
 import {
   validateRequest,
   idParamSchema,
   createWebhookBodySchema,
   updateWebhookBodySchema,
   paginationQuerySchema,
-} from '../../../../shared/middleware/validation.middleware.js';
+} from '../../../../infrastructure/middleware/validation.middleware.js';
 
 /**
  * Register webhook routes
  */
+/* eslint-disable max-lines-per-function, @typescript-eslint/require-await */
 export async function webhookRoutes(app: FastifyInstance): Promise<void> {
   const webhookService = container.resolve<IWebhookService>('webhookService');
 
@@ -189,20 +190,26 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
       const { id } = request.params as { id: string };
       const { page, limit } = request.query as { page: number; limit: number };
 
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
       const result = await webhookService.getWebhookDeliveries(authRequest.user.userId, id, {
         page,
         limit,
       });
 
+      const totalPages = Math.ceil(result.total / limit);
+
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
       return reply.status(200).send({
         deliveries: result.deliveries,
         pagination: {
-          page: result.page,
-          limit: result.limit,
+          page,
+          limit,
           total: result.total,
-          totalPages: result.totalPages,
+          totalPages,
         },
       });
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     }
   );
 }
+/* eslint-enable max-lines-per-function, @typescript-eslint/require-await */

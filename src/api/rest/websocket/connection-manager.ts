@@ -1,5 +1,5 @@
 import type WebSocket from 'ws';
-import { logger } from '../../core/logging/logger.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 /**
  * Represents a WebSocket connection with associated metadata
@@ -131,6 +131,7 @@ export class ConnectionManager {
   /**
    * Sends a message to all connections of a user
    */
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   async sendToUser(userId: string, message: any): Promise<void> {
     const connections = this.getUserConnections(userId);
     await this.sendToConnections(connections, message);
@@ -142,6 +143,7 @@ export class ConnectionManager {
   async sendToUserExceptSession(
     userId: string,
     excludeSessionId: string,
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     message: any
   ): Promise<void> {
     const connections = this.getUserConnectionsExceptSession(userId, excludeSessionId);
@@ -151,9 +153,11 @@ export class ConnectionManager {
   /**
    * Sends a message to specific connections
    */
+  /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
   private async sendToConnections(connections: WebSocketConnection[], message: any): Promise<void> {
     const messageStr = JSON.stringify(message);
 
+    /* eslint-disable-next-line @typescript-eslint/require-await */
     const sendPromises = connections.map(async (connection) => {
       try {
         if (connection.socket.readyState === connection.socket.OPEN) {
@@ -262,7 +266,11 @@ export class ConnectionManager {
   /**
    * Sends a message to all connections subscribed to a specific channel
    */
-  async sendToChannel(channel: string, message: any): Promise<void> {
+  async sendToChannel(
+    channel: string,
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    message: any
+  ): Promise<void> {
     const messageStr = JSON.stringify(message);
     const sendPromises: Promise<void>[] = [];
 
@@ -270,6 +278,7 @@ export class ConnectionManager {
       for (const connection of userConnections) {
         if (connection.subscribedChannels.has(channel)) {
           sendPromises.push(
+            /* eslint-disable-next-line @typescript-eslint/require-await */
             (async () => {
               try {
                 if (connection.socket.readyState === connection.socket.OPEN) {

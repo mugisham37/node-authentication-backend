@@ -2,9 +2,13 @@
  * Result of magic link verification
  */
 export interface MagicLinkVerificationResult {
-  userId: string;
-  email: string;
-  isValid: boolean;
+  user: {
+    id: string;
+    email: string;
+    name: string | null;
+  };
+  accessToken: string;
+  refreshToken: string;
 }
 
 export interface IPasswordlessService {

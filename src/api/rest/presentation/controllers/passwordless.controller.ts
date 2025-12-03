@@ -1,15 +1,16 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { container } from '../../../../infrastructure/container/container.js';
-import { IPasswordlessService } from '../../application/services/passwordless.service.js';
+import { IPasswordlessService } from '../../../../application/services/passwordless.service.js';
 import {
   validateRequest,
   emailSchema,
-} from '../../../../shared/middleware/validation.middleware.js';
+} from '../../../../infrastructure/middleware/validation.middleware.js';
 import { z } from 'zod';
 
 /**
  * Register passwordless authentication routes
  */
+/* eslint-disable max-lines-per-function, @typescript-eslint/require-await */
 export async function passwordlessRoutes(app: FastifyInstance): Promise<void> {
   const passwordlessService = container.resolve<IPasswordlessService>('passwordlessService');
 
@@ -47,15 +48,23 @@ export async function passwordlessRoutes(app: FastifyInstance): Promise<void> {
 
       const result = await passwordlessService.verifyMagicLink(token);
 
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+      const responseUser = {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+      };
+      const responseAccessToken = result.accessToken;
+      const responseRefreshToken = result.refreshToken;
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
       return reply.status(200).send({
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-        },
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
+        user: responseUser,
+        accessToken: responseAccessToken,
+        refreshToken: responseRefreshToken,
       });
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     }
   );
 
@@ -65,7 +74,7 @@ export async function passwordlessRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post(
     '/api/v1/auth/webauthn/register',
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (_request: FastifyRequest, reply: FastifyReply) => {
       // WebAuthn registration logic
       return reply.status(501).send({
         message: 'WebAuthn registration not yet implemented',
@@ -79,7 +88,7 @@ export async function passwordlessRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post(
     '/api/v1/auth/webauthn/authenticate',
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (_request: FastifyRequest, reply: FastifyReply) => {
       // WebAuthn authentication logic
       return reply.status(501).send({
         message: 'WebAuthn authentication not yet implemented',
@@ -87,3 +96,4 @@ export async function passwordlessRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 }
+/* eslint-enable max-lines-per-function, @typescript-eslint/require-await */

@@ -1,9 +1,12 @@
 import { Redis } from 'ioredis';
 import { EmailService } from './email.service.impl.js';
-import { NodemailerProvider, NodemailerConfig } from '../mail/providers/nodemailer-provider.js';
-import { TemplateRenderer } from '../mail/providers/template-renderer.js';
+import {
+  NodemailerProvider,
+  NodemailerConfig,
+} from '../../shared/mail/providers/nodemailer-provider.js';
+import { TemplateRenderer } from '../../shared/mail/providers/template-renderer.js';
 import { EmailQueue } from '../../infrastructure/queue/email-queue.js';
-import { logger } from '../logging/logger.js';
+import { logger } from '../../infrastructure/logging/logger.js';
 
 export interface EmailServiceConfig {
   nodemailer: NodemailerConfig;

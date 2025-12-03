@@ -7,6 +7,7 @@ import { DeviceFingerprint } from '../../domain/value-objects/device-fingerprint
 import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
 import { ISessionRepository } from '../../domain/repositories/session.repository.js';
+import { ITokenService } from './token.service.js';
 import {
   AuthenticationError,
   ConflictError,
@@ -47,6 +48,8 @@ export interface RegisterOutput {
     image: string | null;
     emailVerified: boolean;
   };
+  accessToken: string;
+  refreshToken: string;
   emailVerificationToken: string;
 }
 
@@ -76,9 +79,13 @@ export interface LoginOutput {
     emailVerified: boolean;
     mfaEnabled: boolean;
   };
+  accessToken?: string;
+  refreshToken?: string;
   session?: {
     id: string;
     expiresAt: Date;
+    deviceName: string;
+    trustScore: number;
   };
   mfaChallengeId?: string;
   requiresMFA: boolean;
@@ -158,6 +165,12 @@ export interface IAuthenticationService {
    * Requirements: 10.2, 10.3, 10.5, 10.6
    */
   resetPassword(input: ResetPasswordInput): Promise<void>;
+
+  /**
+   * Refresh access and refresh tokens
+   * Requirements: 7.2
+   */
+  refreshTokens(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }>;
 }
 
 /**
@@ -181,7 +194,8 @@ export class AuthenticationService implements IAuthenticationService {
 
   constructor(
     private readonly userRepository: IUserRepository,
-    private readonly sessionRepository: ISessionRepository
+    private readonly sessionRepository: ISessionRepository,
+    private readonly tokenService: ITokenService
   ) {}
 
   /**
@@ -233,6 +247,18 @@ export class AuthenticationService implements IAuthenticationService {
     // Track business metric (Requirement 22.1)
     userRegistrations.inc({ method: 'email' });
 
+    // Create initial session for the user
+    const sessionId = randomUUID();
+    
+    // Generate tokens
+    const tokens = this.tokenService.generateTokens(
+      savedUser.id,
+      savedUser.email.toString(),
+      [], // roles - empty for new users
+      [], // permissions - empty for new users
+      sessionId
+    );
+
     return {
       user: {
         id: savedUser.id,
@@ -241,6 +267,8 @@ export class AuthenticationService implements IAuthenticationService {
         image: savedUser.image,
         emailVerified: savedUser.emailVerified,
       },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       emailVerificationToken: verificationToken,
     };
   }
@@ -268,6 +296,15 @@ export class AuthenticationService implements IAuthenticationService {
       // Create session (Requirement 3.7)
       const session = await this.createSession(user.id, input);
 
+      // Generate tokens
+      const tokens = this.tokenService.generateTokens(
+        user.id,
+        user.email.toString(),
+        [], // roles - should be fetched from user in production
+        [], // permissions - should be fetched from user in production
+        session.id
+      );
+
       // Emit domain event
       // new UserLoggedInEvent(user.id, session.id, input.ipAddress, input.userAgent);
 
@@ -277,9 +314,13 @@ export class AuthenticationService implements IAuthenticationService {
 
       return {
         user: this.mapUserToOutput(user),
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         session: {
           id: session.id,
           expiresAt: session.expiresAt,
+          deviceName: session.deviceName,
+          trustScore: session.trustScore,
         },
         requiresMFA: false,
       };
@@ -528,4 +569,45 @@ export class AuthenticationService implements IAuthenticationService {
     // Save session
     return this.sessionRepository.create(session);
   }
+
+  /**
+   * Refresh access and refresh tokens
+   * Requirements: 7.2
+   */
+  async refreshTokens(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+    // Verify the refresh token
+    const payload = this.tokenService.verifyRefreshToken(refreshToken);
+
+    // Find the session
+    const session = await this.sessionRepository.findById(payload.sessionId);
+    if (!session) {
+      throw new AuthenticationError('Invalid session');
+    }
+
+    // Check if session is expired
+    if (session.isExpired()) {
+      throw new AuthenticationError('Session expired');
+    }
+
+    // Find the user
+    const user = await this.userRepository.findById(payload.userId);
+    if (!user) {
+      throw new NotFoundError('User');
+    }
+
+    // Generate new tokens
+    const tokens = this.tokenService.generateTokens(
+      user.id,
+      user.email.toString(),
+      [], // roles - should be fetched from user in production
+      [], // permissions - should be fetched from user in production
+      session.id
+    );
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
 }
+

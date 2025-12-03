@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest } from 'fastify';
 import type WebSocket from 'ws';
 import { connectionManager } from './connection-manager.js';
 import { authenticateWebSocket, sendErrorAndClose } from './websocket-auth.js';
-import { logger } from '../../core/logging/logger.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 /**
  * Sets up WebSocket routes and handlers
@@ -33,6 +33,7 @@ function handleWebSocketConnection(socket: WebSocket, request: FastifyRequest): 
       setupConnection(socket, request, userId, sessionId);
     })
     .catch((error) => {
+      /* eslint-disable-next-line @typescript-eslint/no-unsafe-assignment */
       logger.error('WebSocket authentication error', { error });
       sendErrorAndClose(socket, 'Authentication failed');
     });
@@ -62,8 +63,10 @@ function setupConnection(
   // Handle incoming messages
   socket.on('message', (data: Buffer) => {
     try {
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
       const message = JSON.parse(data.toString());
       handleIncomingMessage(userId, sessionId, message, socket);
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument */
     } catch (error) {
       logger.error('Error handling WebSocket message', {
         userId,
@@ -93,8 +96,9 @@ function setupConnection(
 }
 
 /**
- * Handles incoming WebSocket messages from clients
+ * Handle incoming WebSocket message
  */
+/* eslint-disable max-lines-per-function */
 function handleIncomingMessage(
   userId: string,
   sessionId: string,

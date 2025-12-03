@@ -1,8 +1,8 @@
 import { FastifyRequest } from 'fastify';
 import type WebSocket from 'ws';
 import jwt from 'jsonwebtoken';
-import { env } from '../../config/env.js';
-import { logger } from '../../core/logging/logger.js';
+import { env } from '../../../infrastructure/config/env.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 /**
  * Decoded JWT payload

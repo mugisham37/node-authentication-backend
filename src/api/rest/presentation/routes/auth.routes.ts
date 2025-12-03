@@ -1,6 +1,10 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { container } from '../../core/container/container.js';
-import { IAuthenticationService } from '../../../../application/services/authentication.service.js';
+import { container } from '../../../../infrastructure/container/container.js';
+import {
+  IAuthenticationService,
+  RegisterOutput,
+  LoginOutput,
+} from '../../../../application/services/authentication.service.js';
 import {
   validateRequest,
   registerBodySchema,
@@ -9,16 +13,16 @@ import {
   verifyEmailBodySchema,
   forgotPasswordBodySchema,
   resetPasswordBodySchema,
-} from '../middleware/validation.middleware.js';
+} from '../../../../infrastructure/middleware/validation.middleware.js';
 import {
   authenticationMiddleware,
   AuthenticatedRequest,
-} from '../middleware/authentication.middleware.js';
+} from '../../../../infrastructure/middleware/authentication.middleware.js';
 import {
   registrationRateLimiter,
   authenticationRateLimiter,
   passwordResetRateLimiter,
-} from '../middleware/rate-limit.middleware.js';
+} from '../../../../infrastructure/middleware/rate-limit.middleware.js';
 import {
   registerRequestSchema,
   registerResponseSchema,
@@ -42,6 +46,7 @@ import {
 /**
  * Register authentication routes
  */
+/* eslint-disable max-lines-per-function, @typescript-eslint/require-await */
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   const authService = container.resolve<IAuthenticationService>('authenticationService');
 
@@ -76,25 +81,32 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         image?: string;
       };
 
-      const result = await authService.register({
+      const result: RegisterOutput = await authService.register({
         email,
         password,
         name,
         image,
       });
 
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+      const responseUser = {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        image: result.user.image,
+        emailVerified: result.user.emailVerified,
+      };
+      const responseAccessToken = result.accessToken;
+      const responseRefreshToken = result.refreshToken;
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
+
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
       return reply.status(201).send({
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-          image: result.user.image,
-          emailVerified: result.user.emailVerified,
-          createdAt: result.user.createdAt,
-        },
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
+        user: responseUser,
+        accessToken: responseAccessToken,
+        refreshToken: responseRefreshToken,
       });
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     }
   );
 
@@ -127,38 +139,65 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         password: string;
       };
 
-      const result = await authService.login({
+      const userAgent = request.headers['user-agent'] || 'Unknown';
+      // Extract device name from user agent (simplified)
+      const deviceName = userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop';
+
+      const result: LoginOutput = await authService.login({
         email,
         password,
+        deviceName,
         ipAddress: request.ip,
-        userAgent: request.headers['user-agent'] || '',
+        userAgent: userAgent,
       });
 
       // If MFA is enabled, return challenge instead of tokens
-      if ('challengeId' in result) {
+      if ('challengeId' in result && result.mfaChallengeId) {
         return reply.status(200).send({
           mfaRequired: true,
-          challengeId: result.challengeId,
+          challengeId: result.mfaChallengeId,
         });
       }
 
-      return reply.status(200).send({
-        user: {
-          id: result.user.id,
-          email: result.user.email,
-          name: result.user.name,
-          image: result.user.image,
-          emailVerified: result.user.emailVerified,
-          mfaEnabled: result.user.mfaEnabled,
-        },
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        session: {
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+      // Extract values with explicit typing
+      const responseUser = {
+        id: result.user.id,
+        email: result.user.email,
+        name: result.user.name,
+        image: result.user.image,
+        emailVerified: result.user.emailVerified,
+        mfaEnabled: result.user.mfaEnabled,
+      };
+      const responseAccessToken = result.accessToken || '';
+      const responseRefreshToken = result.refreshToken || '';
+
+      // Return successful login with tokens
+      const response: {
+        user: typeof responseUser;
+        accessToken: string;
+        refreshToken: string;
+        session?: {
+          id: string;
+          deviceName: string;
+          trustScore: number;
+        };
+      } = {
+        user: responseUser,
+        accessToken: responseAccessToken,
+        refreshToken: responseRefreshToken,
+      };
+
+      if (result.session) {
+        response.session = {
           id: result.session.id,
           deviceName: result.session.deviceName,
           trustScore: result.session.trustScore,
-        },
-      });
+        };
+      }
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
+
+      return reply.status(200).send(response);
     }
   );
 
@@ -216,12 +255,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { refreshToken } = request.body as { refreshToken: string };
 
-      const result = await authService.refreshTokens(refreshToken);
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
+      const tokens = await authService.refreshTokens(refreshToken);
+      const responseAccessToken = tokens.accessToken;
+      const responseRefreshToken = tokens.refreshToken;
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 
+      /* eslint-disable @typescript-eslint/no-unsafe-assignment */
       return reply.status(200).send({
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
+        accessToken: responseAccessToken,
+        refreshToken: responseRefreshToken,
       });
+      /* eslint-enable @typescript-eslint/no-unsafe-assignment */
     }
   );
 
@@ -246,7 +291,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { token } = request.body as { token: string };
 
-      await authService.verifyEmail(token);
+      await authService.verifyEmail({ token });
 
       return reply.status(200).send({
         message: 'Email verified successfully',
@@ -276,7 +321,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     async (request: FastifyRequest, reply: FastifyReply) => {
       const { email } = request.body as { email: string };
 
-      await authService.requestPasswordReset(email);
+      await authService.requestPasswordReset({ email });
 
       // Always return success to prevent email enumeration
       return reply.status(200).send({
@@ -311,7 +356,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         password: string;
       };
 
-      await authService.resetPassword(token, password);
+      await authService.resetPassword({ token, newPassword: password });
 
       return reply.status(200).send({
         message: 'Password reset successfully',
