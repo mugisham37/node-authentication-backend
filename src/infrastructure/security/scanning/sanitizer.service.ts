@@ -51,7 +51,7 @@ export class SanitizerService {
   }
 
   /**
-   * Sanitize SQL input (though Prisma/Drizzle handle this)
+   * Sanitize SQL input (though Drizzle handles this)
    * Additional layer of defense
    * @param input - SQL string to sanitize
    * @returns string - Sanitized SQL

@@ -1,5 +1,4 @@
 import { initializePostgres, closePostgres, getPool, getDatabase } from './connections/postgres.js';
-import { initializePrisma, closePrisma, getPrisma } from './connections/prisma.js';
 import { initializeRedis, closeRedis, getRedis } from '../cache/redis.js';
 import { log } from '../logging/logger.js';
 
@@ -12,9 +11,6 @@ export async function initializeDatabase(): Promise<void> {
 
     // Initialize PostgreSQL with Drizzle
     await initializePostgres();
-
-    // Initialize Prisma (optional, can be used alongside Drizzle)
-    initializePrisma();
 
     // Initialize Redis
     await initializeRedis();
@@ -33,7 +29,7 @@ export async function closeDatabase(): Promise<void> {
   try {
     log.info('Closing database and cache connections...');
 
-    await Promise.all([closePostgres(), closePrisma(), closeRedis()]);
+    await Promise.all([closePostgres(), closeRedis()]);
 
     log.info('Database and cache connections closed successfully');
   } catch (error) {
@@ -43,7 +39,7 @@ export async function closeDatabase(): Promise<void> {
 }
 
 // Export connection getters
-export { getPool, getDatabase, getPrisma, getRedis };
+export { getPool, getDatabase, getRedis };
 
 // Export schemas
 export * from './schema/index.js';
@@ -56,6 +52,5 @@ export default {
   closeDatabase,
   getPool,
   getDatabase,
-  getPrisma,
   getRedis,
 };
