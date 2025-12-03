@@ -1,247 +1,247 @@
-import { randomBytes, createHash } from 'crypto';
-import jwt from 'jsonwebtoken';
-import { User } from '../../domain/entities/user.entity.js';
-import { AuthenticationError } from '../../core/errors/types/application-error.js';
-import * as redis from '../../core/cache/redis.js';
-import { log } from '../../core/logging/logger.js';
+import { JwtService, TokenPair } from '../../../../shared/security/tokens/jwt.service.js';
+import { logger } from '../../../../shared/logging/logger.js';
 
 /**
- * JWT Payload structure
- * Requirements: 6.1
- */
-export interface TokenPayload {
-  userId: string;
-  email: string;
-  iat: number;
-  exp: number;
-}
-
-/**
- * Token generation output
- * Requirements: 6.1, 6.4, 6.5
- */
-export interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
-  accessTokenExpiresAt: Date;
-  refreshTokenExpiresAt: Date;
-}
-
-/**
- * Token refresh output
- * Requirements: 6.1, 6.6
- */
-export interface RefreshOutput {
-  accessToken: string;
-  refreshToken: string;
-  accessTokenExpiresAt: Date;
-  refreshTokenExpiresAt: Date;
-}
-
-/**
- * Token family data for reuse detection
- * Requirements: 6.7
- */
-interface TokenFamily {
-  userId: string;
-  familyId: string;
-  tokenHashes: string[];
-  createdAt: Date;
-}
-
-/**
- * Token Service Interface
- * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
+ * Token Service
+ * High-level service for managing authentication tokens
+ * Uses centralized JwtService for token operations
+ * Requirements: 3.7, 7.1, 7.2
  */
 export interface ITokenService {
   /**
-   * Generate access and refresh token pair
-   * Requirements: 6.1, 6.4, 6.5
+   * Generate access and refresh tokens for a user session
    */
-  generateTokenPair(user: User): Promise<TokenPair>;
+  generateTokens(
+    userId: string,
+    email: string,
+    roles: string[],
+    permissions: string[],
+    sessionId: string
+  ): TokenPair;
 
   /**
-   * Generate access token with RS256
-   * Requirements: 6.1, 6.4
+   * Verify access token and return payload
    */
-  generateAccessToken(user: User): string;
+  verifyAccessToken(token: string): {
+    userId: string;
+    email?: string;
+    roles?: string[];
+    permissions?: string[];
+    sessionId?: string;
+  };
 
   /**
-   * Generate refresh token with crypto
-   * Requirements: 6.1, 6.5
+   * Verify refresh token and return payload
    */
-  generateRefreshToken(): string;
+  verifyRefreshToken(token: string): {
+    userId: string;
+    sessionId: string;
+  };
 
   /**
-   * Verify and decode access token
-   * Requirements: 6.1
+   * Refresh access token using refresh token
    */
-  verifyAccessToken(token: string): TokenPayload;
+  refreshAccessToken(
+    refreshToken: string,
+    roles: string[],
+    permissions: string[]
+  ): { accessToken: string; expiresIn: number };
 
   /**
-   * Hash refresh token for storage
-   * Requirements: 6.1
+   * Generate email verification token
    */
-  hashRefreshToken(token: string): string;
+  generateVerificationToken(userId: string, email: string): string;
 
   /**
-   * Refresh tokens with rotation
-   * Requirements: 6.1, 6.6
+   * Verify email verification token
    */
-  refreshTokens(refreshToken: string, userId: string): Promise<RefreshOutput>;
+  verifyVerificationToken(token: string): { userId: string; email: string };
 
   /**
-   * Revoke refresh token
-   * Requirements: 6.3
+   * Generate password reset token
    */
-  revokeRefreshToken(tokenHash: string): Promise<void>;
+  generateResetToken(userId: string, email: string): string;
 
   /**
-   * Check if refresh token is revoked
-   * Requirements: 6.3
+   * Verify password reset token
    */
-  isRefreshTokenRevoked(tokenHash: string): Promise<boolean>;
-
-  /**
-   * Revoke entire token family (for reuse detection)
-   * Requirements: 6.7
-   */
-  revokeTokenFamily(familyId: string): Promise<void>;
-
-  /**
-   * Track token in family for reuse detection
-   * Requirements: 6.7
-   */
-  trackTokenInFamily(tokenHash: string, familyId: string, userId: string): Promise<void>;
-
-  /**
-   * Check if token has been reused
-   * Requirements: 6.7
-   */
-  detectTokenReuse(tokenHash: string): Promise<boolean>;
+  verifyResetToken(token: string): { userId: string; email: string };
 }
 
 /**
  * Token Service Implementation
- * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7
  */
 export class TokenService implements ITokenService {
-  private readonly ACCESS_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds (Requirement 6.4)
-  private readonly REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60; // 7 days in seconds (Requirement 6.5)
-  private readonly REVOKED_TOKEN_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
-  private readonly TOKEN_FAMILY_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
-
-  private readonly privateKey: string;
-  private readonly publicKey: string;
-
-  constructor() {
-    // In production, these should be loaded from secure key management system
-    // For now, we'll use environment variables
-    this.privateKey = process.env['JWT_PRIVATE_KEY'] || this.generateDevelopmentKey('private');
-    this.publicKey = process.env['JWT_PUBLIC_KEY'] || this.generateDevelopmentKey('public');
-
-    if (!process.env['JWT_PRIVATE_KEY']) {
-      log.warn('JWT_PRIVATE_KEY not set, using development key. DO NOT use in production!');
-    }
-  }
-
   /**
-   * Generate development keys (for testing only)
-   * In production, use proper RSA key pairs
+   * Generate access and refresh tokens for a user session
+   * Requirements: 3.7, 7.1
    */
-  private generateDevelopmentKey(type: 'private' | 'public'): string {
-    // This is a placeholder - in production, use proper RSA keys
-    return type === 'private'
-      ? '-----BEGIN PRIVATE KEY-----\nDEVELOPMENT_KEY\n-----END PRIVATE KEY-----'
-      : '-----BEGIN PUBLIC KEY-----\nDEVELOPMENT_KEY\n-----END PUBLIC KEY-----';
-  }
-
-  /**
-   * Generate access and refresh token pair
-   * Requirements: 6.1, 6.4, 6.5
-   */
-  async generateTokenPair(user: User): Promise<TokenPair> {
-    const accessToken = this.generateAccessToken(user);
-    const refreshToken = this.generateRefreshToken();
-
-    const now = Date.now();
-    const accessTokenExpiresAt = new Date(now + this.ACCESS_TOKEN_EXPIRY * 1000);
-    const refreshTokenExpiresAt = new Date(now + this.REFRESH_TOKEN_EXPIRY * 1000);
-
-    // Create token family for reuse detection (Requirement 6.7)
-    const familyId = randomBytes(16).toString('hex');
-    const tokenHash = this.hashRefreshToken(refreshToken);
-    await this.trackTokenInFamily(tokenHash, familyId, user.id);
-
-    return {
-      accessToken,
-      refreshToken,
-      accessTokenExpiresAt,
-      refreshTokenExpiresAt,
-    };
-  }
-
-  /**
-   * Generate access token with RS256
-   * Requirements: 6.1, 6.4
-   */
-  generateAccessToken(user: User): string {
-    const now = Math.floor(Date.now() / 1000);
-
-    const payload: TokenPayload = {
-      userId: user.id,
-      email: user.email.toString(),
-      iat: now,
-      exp: now + this.ACCESS_TOKEN_EXPIRY, // 15 minutes (Requirement 6.4)
-    };
-
+  generateTokens(
+    userId: string,
+    email: string,
+    roles: string[],
+    permissions: string[],
+    sessionId: string
+  ): TokenPair {
     try {
-      // Use RS256 algorithm for asymmetric signing (Requirement 6.1)
-      return jwt.sign(payload, this.privateKey, {
-        algorithm: 'RS256',
-      });
+      const tokens = JwtService.generateTokenPair(userId, email, roles, permissions, sessionId);
+
+      logger.info('Tokens generated', { userId, sessionId });
+
+      return tokens;
     } catch (error) {
-      log.error('Failed to generate access token', error as Error);
-      throw new AuthenticationError('Failed to generate access token');
+      logger.error('Failed to generate tokens', error as Error, { userId, sessionId });
+      throw error;
     }
   }
 
   /**
-   * Generate refresh token with crypto
-   * Requirements: 6.1, 6.5
+   * Verify access token and return payload
+   * Requirements: 7.2
    */
-  generateRefreshToken(): string {
-    // Generate cryptographically secure random token (Requirement 6.1)
-    return randomBytes(32).toString('hex');
-  }
-
-  /**
-   * Verify and decode access token
-   * Requirements: 6.1
-   */
-  verifyAccessToken(token: string): TokenPayload {
+  verifyAccessToken(token: string): {
+    userId: string;
+    email?: string;
+    roles?: string[];
+    permissions?: string[];
+    sessionId?: string;
+  } {
     try {
-      // Verify with RS256 public key
-      const decoded = jwt.verify(token, this.publicKey, {
-        algorithms: ['RS256'],
-      }) as TokenPayload;
+      const payload = JwtService.verifyAccessToken(token);
 
-      return decoded;
+      return {
+        userId: payload.userId,
+        email: payload.email,
+        roles: payload.roles,
+        permissions: payload.permissions,
+        sessionId: payload.sessionId,
+      };
     } catch (error) {
-      if (error instanceof jwt.TokenExpiredError) {
-        throw new AuthenticationError('Access token has expired');
-      }
-      if (error instanceof jwt.JsonWebTokenError) {
-        throw new AuthenticationError('Invalid access token');
-      }
-      log.error('Failed to verify access token', error as Error);
-      throw new AuthenticationError('Token verification failed');
+      logger.error('Failed to verify access token', error as Error);
+      throw error;
     }
   }
 
   /**
-   * Hash refresh token for storage
-   * Requirements: 6.1
+   * Verify refresh token and return payload
+   * Requirements: 7.2
+   */
+  verifyRefreshToken(token: string): {
+    userId: string;
+    sessionId: string;
+  } {
+    try {
+      const payload = JwtService.verifyRefreshToken(token);
+
+      if (!payload.sessionId) {
+        throw new Error('Invalid refresh token: missing sessionId');
+      }
+
+      return {
+        userId: payload.userId,
+        sessionId: payload.sessionId,
+      };
+    } catch (error) {
+      logger.error('Failed to verify refresh token', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Refresh access token using refresh token
+   * Requirements: 7.2
+   */
+  refreshAccessToken(
+    refreshToken: string,
+    roles: string[],
+    permissions: string[]
+  ): { accessToken: string; expiresIn: number } {
+    try {
+      // Verify refresh token
+      const payload = this.verifyRefreshToken(refreshToken);
+
+      // Generate new access token
+      const accessToken = JwtService.generateAccessToken(
+        payload.userId,
+        '', // Email not needed for refresh
+        roles,
+        permissions,
+        payload.sessionId
+      );
+
+      logger.info('Access token refreshed', { userId: payload.userId, sessionId: payload.sessionId });
+
+      return {
+        accessToken,
+        expiresIn: 15 * 60, // 15 minutes in seconds
+      };
+    } catch (error) {
+      logger.error('Failed to refresh access token', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate email verification token
+   * Requirements: 2.1
+   */
+  generateVerificationToken(userId: string, email: string): string {
+    try {
+      const token = JwtService.generateVerificationToken(userId, email);
+
+      logger.info('Verification token generated', { userId, email });
+
+      return token;
+    } catch (error) {
+      logger.error('Failed to generate verification token', error as Error, { userId, email });
+      throw error;
+    }
+  }
+
+  /**
+   * Verify email verification token
+   * Requirements: 2.1
+   */
+  verifyVerificationToken(token: string): { userId: string; email: string } {
+    try {
+      const payload = JwtService.verifyVerificationToken(token);
+
+      if (!payload.email) {
+        throw new Error('Invalid verification token: missing email');
+      }
+
+      return {
+        userId: payload.userId,
+        email: payload.email,
+      };
+    } catch (error) {
+      logger.error('Failed to verify verification token', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate password reset token
+   * Requirements: 10.1
+   */
+  generateResetToken(userId: string, email: string): string {
+    try {
+      const token = JwtService.generateResetToken(userId, email);
+
+      logger.info('Reset token generated', { userId, email });
+
+      return token;
+    } catch (error) {
+      logger.error('Failed to generate reset token', error as Error, { userId, email });
+      throw error;
+    }
+  }
+
+  /**
+   * Verify password reset token
+   * Requirements: 10.2
+   */
+  verifyResetToken(token: string): { userId: string; ema
    */
   hashRefreshToken(token: string): string {
     // Use SHA-256 for hashing refresh tokens

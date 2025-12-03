@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import type {
   IWebhookDeliveryService,
   WebhookEvent,
@@ -6,6 +5,7 @@ import type {
 } from '../../shared/application/services/webhook-delivery.service.js';
 import { WebhookQueue } from '../../core/queue/webhook-queue.js';
 import { logger } from '../../shared/logging/logger.js';
+import { HmacService } from '../security/hashing/hmac.service.js';
 
 export class WebhookDeliveryService implements IWebhookDeliveryService {
   private webhookQueue: WebhookQueue;
@@ -39,8 +39,8 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
   }
 
   async deliverWebhook(event: WebhookEvent, attemptCount: number): Promise<WebhookDeliveryResult> {
-    const payloadString = JSON.stringify(event.payload);
-    const signature = this.generateSignature(payloadString, event.secret);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const { signature } = HmacService.generateWebhookSignature(event.payload, event.secret, timestamp);
 
     try {
       const controller = new AbortController();
@@ -51,11 +51,12 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
         headers: {
           'Content-Type': 'application/json',
           'X-Webhook-Signature': signature,
+          'X-Webhook-Timestamp': timestamp.toString(),
           'X-Webhook-Event': event.type,
           'X-Webhook-Delivery-Attempt': attemptCount.toString(),
           'User-Agent': 'Enterprise-Auth-Webhook/1.0',
         },
-        body: payloadString,
+        body: JSON.stringify(event.payload),
         signal: controller.signal,
       });
 
@@ -110,10 +111,6 @@ export class WebhookDeliveryService implements IWebhookDeliveryService {
         attemptCount,
       };
     }
-  }
-
-  generateSignature(payload: string, secret: string): string {
-    return crypto.createHmac('sha256', secret).update(payload).digest('hex');
   }
 
   async getQueueMetrics() {

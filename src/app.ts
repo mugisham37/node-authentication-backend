@@ -307,7 +307,8 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
 async function registerRoutes(app: FastifyInstance): Promise<void> {
   const { authRoutes } = await import('./presentation/routes/auth.routes.js');
   const { mfaRoutes } = await import('./presentation/routes/mfa.routes.js');
-  const { passwordlessRoutes } = await import('./modules/passwordless/presentation/controllers/passwordless.controller.js');
+  const { passwordlessRoutes } =
+    await import('./modules/passwordless/presentation/controllers/passwordless.controller.js');
   const { oauthRoutes } = await import('./presentation/routes/oauth.routes.js');
   const { sessionRoutes } = await import('./presentation/routes/session.routes.js');
   const { deviceRoutes } = await import('./presentation/routes/device.routes.js');

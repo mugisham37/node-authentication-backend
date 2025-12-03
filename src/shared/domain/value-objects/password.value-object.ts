@@ -1,8 +1,9 @@
-import { hash, verify } from '@node-rs/argon2';
-import { ValidationError } from '../../core/errors/types/application-error.js';
+import { ValidationError } from '../../../shared/errors/types/application-error.js';
+import { Argon2Service } from '../../security/hashing/argon2.service.js';
 
 /**
  * Password value object with complexity validation and Argon2id hashing.
+ * Uses centralized Argon2Service for consistent hashing across the application.
  * Requirements: 1.3, 1.4, 1.7
  */
 export class Password {
@@ -40,30 +41,22 @@ export class Password {
   }
 
   /**
-   * Hashes the password using Argon2id algorithm
+   * Hashes the password using centralized Argon2Service
    * Configuration per Requirement 1.7:
    * - Algorithm: Argon2id
-   * - Time cost: 2
+   * - Time cost: 3
    * - Memory cost: 65536 KB (64 MB)
-   * - Parallelism: 1
+   * - Parallelism: 4
    */
   async hash(): Promise<string> {
-    return hash(this.value, {
-      memoryCost: 65536,
-      timeCost: 2,
-      parallelism: 1,
-    });
+    return Argon2Service.hashPassword(this.value);
   }
 
   /**
    * Verifies a password against a hash using constant-time comparison
    */
   async verify(passwordHash: string): Promise<boolean> {
-    try {
-      return await verify(passwordHash, this.value);
-    } catch {
-      return false;
-    }
+    return Argon2Service.verifyPassword(passwordHash, this.value);
   }
 
   /**
