@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { BaseController } from './base.controller.js';
 import { IWebhookService } from '../../../../application/services/webhook.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { WebhookSerializer } from '../../../common/serializers/webhook.serializer.js';
 
 /**
  * Webhook controller handling webhook CRUD operations and delivery tracking
@@ -29,14 +30,7 @@ export class WebhookController extends BaseController {
     });
 
     return this.created(reply, {
-      webhook: {
-        id: webhook.id,
-        url: webhook.url,
-        events: webhook.events,
-        secret: webhook.secret,
-        isActive: webhook.isActive,
-        createdAt: webhook.createdAt,
-      },
+      webhook: WebhookSerializer.toDTO(webhook),
     });
   }
 
@@ -49,13 +43,7 @@ export class WebhookController extends BaseController {
     const webhooks = await this.webhookService.getUserWebhooks(authRequest.user.userId);
 
     return this.success(reply, {
-      webhooks: webhooks.map((webhook) => ({
-        id: webhook.id,
-        url: webhook.url,
-        events: webhook.events,
-        isActive: webhook.isActive,
-        createdAt: webhook.createdAt,
-      })),
+      webhooks: WebhookSerializer.toSummaryList(webhooks),
     });
   }
 
@@ -69,15 +57,7 @@ export class WebhookController extends BaseController {
     const webhook = await this.webhookService.getWebhook(authRequest.user.userId, id);
 
     return this.success(reply, {
-      webhook: {
-        id: webhook.id,
-        url: webhook.url,
-        events: webhook.events,
-        secret: webhook.secret,
-        isActive: webhook.isActive,
-        createdAt: webhook.createdAt,
-        updatedAt: webhook.updatedAt,
-      },
+      webhook: WebhookSerializer.toDTO(webhook),
     });
   }
 
@@ -102,13 +82,7 @@ export class WebhookController extends BaseController {
     });
 
     return this.success(reply, {
-      webhook: {
-        id: webhook.id,
-        url: webhook.url,
-        events: webhook.events,
-        isActive: webhook.isActive,
-        updatedAt: webhook.updatedAt,
-      },
+      webhook: WebhookSerializer.toSummary(webhook),
     });
   }
 

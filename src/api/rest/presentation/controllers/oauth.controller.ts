@@ -7,6 +7,8 @@ import {
 } from '../../../../application/services/oauth.service.js';
 import { OAuthAccount } from '../../../../domain/entities/oauth-account.entity.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { UserSerializer } from '../../../common/serializers/user.serializer.js';
+import { OAuthAccountSerializer } from '../../../common/serializers/oauth-account.serializer.js';
 
 /**
  * Request params for OAuth provider routes
@@ -108,19 +110,9 @@ export class OAuthController extends BaseController {
     const result = await this.oauthService.handleCallback(input);
 
     return this.success(reply, {
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
-        image: result.user.image,
-        emailVerified: result.user.emailVerified,
-      },
+      user: UserSerializer.toPublic(result.user),
       isNewUser: result.isNewUser,
-      oauthAccount: {
-        id: result.oauthAccount.id,
-        provider: result.oauthAccount.provider,
-        providerAccountId: result.oauthAccount.providerAccountId,
-      },
+      oauthAccount: OAuthAccountSerializer.toDTO(result.oauthAccount),
     });
   }
 
@@ -133,12 +125,7 @@ export class OAuthController extends BaseController {
     const accounts = await this.oauthService.getUserOAuthAccounts(authRequest.user.userId);
 
     return this.success(reply, {
-      accounts: accounts.map((account: OAuthAccount) => ({
-        id: account.id,
-        provider: account.provider,
-        providerAccountId: account.providerAccountId,
-        createdAt: account.createdAt,
-      })),
+      accounts: OAuthAccountSerializer.toDTOList(accounts),
     });
   }
 

@@ -6,6 +6,7 @@ import {
   LoginOutput,
 } from '../../../../application/services/authentication.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { UserSerializer } from '../../../common/serializers/user.serializer.js';
 
 /**
  * Authentication controller handling user registration, login, logout, and password management
@@ -33,16 +34,8 @@ export class AuthController extends BaseController {
       image,
     });
 
-    const responseUser = {
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      image: result.user.image,
-      emailVerified: result.user.emailVerified,
-    };
-
     return this.created(reply, {
-      user: responseUser,
+      user: UserSerializer.toPublic(result.user),
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
     });
@@ -83,22 +76,13 @@ export class AuthController extends BaseController {
    * Build login response with user and session data
    */
   private buildLoginResponse(reply: FastifyReply, result: LoginOutput): FastifyReply {
-    const responseUser = {
-      id: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      image: result.user.image,
-      emailVerified: result.user.emailVerified,
-      mfaEnabled: result.user.mfaEnabled,
-    };
-
     const response: {
-      user: typeof responseUser;
+      user: ReturnType<typeof UserSerializer.toPublic>;
       accessToken: string;
       refreshToken: string;
       session?: { id: string; deviceName: string; trustScore: number };
     } = {
-      user: responseUser,
+      user: UserSerializer.toPublic(result.user),
       accessToken: result.accessToken || '',
       refreshToken: result.refreshToken || '',
     };

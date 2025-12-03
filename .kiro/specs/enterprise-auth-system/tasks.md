@@ -1387,7 +1387,10 @@
   - Create OAuthAccountSerializer with toDTO method
   - _Requirements: 24.1, 24.2, 24.3, 24.4, 24.5, 24.6_
 
-- [ ] 25.11 Update controllers to use serializers
+
+- [x] 25.11 Update controllers to use serializers
+
+
   - Update AuthController to use UserSerializer
   - Update MFAController to use UserSerializer
   - Update SessionController to use SessionSerializer

@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { BaseController } from './base.controller.js';
 import { IUserService } from '../../../../application/services/user.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { UserSerializer } from '../../../common/serializers/user.serializer.js';
 
 /**
  * User controller handling user profile and account management operations
@@ -20,15 +21,7 @@ export class UserController extends BaseController {
     const user = await this.userService.getUserById(authRequest.user.userId);
 
     return this.success(reply, {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        image: user.image,
-        emailVerified: user.emailVerified,
-        mfaEnabled: user.mfaEnabled,
-        createdAt: user.createdAt,
-      },
+      user: UserSerializer.toProfile(user),
     });
   }
 
@@ -42,12 +35,7 @@ export class UserController extends BaseController {
     const user = await this.userService.updateProfile(authRequest.user.userId, { name, image });
 
     return this.success(reply, {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        image: user.image,
-      },
+      user: UserSerializer.toPublic(user),
     });
   }
 

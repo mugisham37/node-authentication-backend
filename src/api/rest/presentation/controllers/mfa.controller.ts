@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { BaseController } from './base.controller.js';
 import { IMFAService } from '../../../../application/services/mfa.service.js';
 import { AuthenticatedRequest } from '../../../../infrastructure/middleware/authentication.middleware.js';
+import { UserSerializer } from '../../../common/serializers/user.serializer.js';
 
 /**
  * MFA controller handling multi-factor authentication setup, verification, and management
@@ -68,14 +69,7 @@ export class MFAController extends BaseController {
     });
 
     return this.success(reply, {
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
-        image: result.user.image,
-        emailVerified: result.user.emailVerified,
-        mfaEnabled: result.user.mfaEnabled,
-      },
+      user: UserSerializer.toPublic(result.user),
       session: {
         id: result.session.id,
         expiresAt: result.session.expiresAt,

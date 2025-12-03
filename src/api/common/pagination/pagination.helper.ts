@@ -134,9 +134,10 @@ export class PaginationHelper {
     total: number
   ): PaginationMeta & { nextCursor?: string; previousCursor?: string } {
     const hasNext = data.length === limit;
-    const nextCursor =
-      hasNext && data.length > 0 ? this.encodeCursor(data[data.length - 1].id) : undefined;
-    const previousCursor = data.length > 0 ? this.encodeCursor(data[0].id) : undefined;
+    const lastItem = data[data.length - 1];
+    const firstItem = data[0];
+    const nextCursor = hasNext && lastItem ? this.encodeCursor(lastItem.id) : undefined;
+    const previousCursor = firstItem ? this.encodeCursor(firstItem.id) : undefined;
 
     return {
       page: 1, // Not applicable for cursor pagination
