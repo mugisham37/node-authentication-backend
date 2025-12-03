@@ -1901,3 +1901,1613 @@ Before marking any task as complete, verify:
 - [ ] Code passes linting and formatting checks
 - [ ] No sensitive data in logs or error messages
 - [ ] Resources properly managed and cleaned up
+
+
+## Controller Layer Architecture
+
+### Overview
+
+The controller layer sits between routes and services, providing a clean separation of HTTP concerns from business logic. Controllers handle request/response transformation, validation coordination, and error handling while delegating business logic to application services.
+
+### Controller Pattern
+
+```typescript
+// Base controller with common functionality
+abstract class BaseController {
+  protected sendSuccess<T>(reply: FastifyReply, data: T, statusCode: number = 200) {
+    return reply.status(statusCode).send(data);
+  }
+  
+  protected sendCreated<T>(reply: FastifyReply, data: T) {
+    return reply.status(201).send(data);
+  }
+  
+  protected sendNoContent(reply: FastifyReply) {
+    return reply.status(204).send();
+  }
+  
+  protected getUserId(request: AuthenticatedRequest): string {
+    return request.user.userId;
+  }
+  
+  protected getSessionId(request: AuthenticatedRequest): string | undefined {
+    return request.user.sessionId;
+  }
+}
+
+// Example: Authentication Controller
+class AuthController extends BaseController {
+  constructor(
+    private readonly authService: IAuthenticationService,
+    private readonly userSerializer: UserSerializer
+  ) {
+    super();
+  }
+  
+  async register(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { email, password, name, image } = request.body as RegisterRequest;
+    
+    const result = await this.authService.register({
+      email,
+      password,
+      name,
+      image,
+    });
+    
+    const response = {
+      user: this.userSerializer.toPublic(result.user),
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    };
+    
+    return this.sendCreated(reply, response);
+  }
+  
+  async login(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { email, password } = request.body as LoginRequest;
+    const userAgent = request.headers['user-agent'] || 'Unknown';
+    const deviceName = userAgent.includes('Mobile') ? 'Mobile Device' : 'Desktop';
+    
+    const result = await this.authService.login({
+      email,
+      password,
+      deviceName,
+      ipAddress: request.ip,
+      userAgent,
+    });
+    
+    // MFA challenge response
+    if ('challengeId' in result && result.mfaChallengeId) {
+      return this.sendSuccess(reply, {
+        mfaRequired: true,
+        challengeId: result.mfaChallengeId,
+      });
+    }
+    
+    // Successful login response
+    const response = {
+      user: this.userSerializer.toPublic(result.user),
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      session: result.session ? {
+        id: result.session.id,
+        deviceName: result.session.deviceName,
+        trustScore: result.session.trustScore,
+      } : undefined,
+    };
+    
+    return this.sendSuccess(reply, response);
+  }
+  
+  async logout(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const authRequest = request as AuthenticatedRequest;
+    const sessionId = this.getSessionId(authRequest);
+    
+    if (sessionId) {
+      await this.authService.logout(sessionId);
+    }
+    
+    return this.sendSuccess(reply, { message: 'Logged out successfully' });
+  }
+  
+  async getCurrentUser(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const authRequest = request as AuthenticatedRequest;
+    const userId = this.getUserId(authRequest);
+    
+    const user = await this.authService.getUserById(userId);
+    const response = this.userSerializer.toPublic(user);
+    
+    return this.sendSuccess(reply, { user: response });
+  }
+}
+```
+
+### Controller Organization
+
+```
+src/api/rest/presentation/controllers/
+├── base.controller.ts           # Base controller with common methods
+├── auth.controller.ts           # Authentication operations
+├── mfa.controller.ts            # MFA operations
+├── oauth.controller.ts          # OAuth operations
+├── passwordless.controller.ts   # Passwordless authentication
+├── session.controller.ts        # Session management
+├── device.controller.ts         # Device management
+├── user.controller.ts           # User profile operations
+├── admin.controller.ts          # Admin operations
+├── webhook.controller.ts        # Webhook management
+└── index.ts                     # Export all controllers
+```
+
+### Controller Responsibilities
+
+**DO:**
+- Extract and validate request data
+- Call appropriate service methods
+- Transform service responses using serializers
+- Set appropriate HTTP status codes
+- Handle HTTP-specific concerns (headers, cookies)
+- Coordinate multiple service calls if needed
+
+**DON'T:**
+- Implement business logic
+- Access database directly
+- Perform complex calculations
+- Make external API calls directly
+- Handle domain events
+
+
+
+## Pagination System Design
+
+### Pagination Types
+
+The system supports two pagination strategies:
+
+**Offset-Based Pagination** - Traditional page/limit approach
+- Best for: Small to medium datasets, UI with page numbers
+- Pros: Simple, supports jumping to specific pages
+- Cons: Performance degrades with large offsets, inconsistent with concurrent modifications
+
+**Cursor-Based Pagination** - Uses opaque cursor for position
+- Best for: Large datasets, infinite scroll, real-time data
+- Pros: Consistent performance, handles concurrent modifications
+- Cons: Cannot jump to specific pages, more complex implementation
+
+### Pagination Implementation
+
+```typescript
+// Pagination types
+interface PaginationParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+}
+
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: PaginationMeta;
+}
+
+interface CursorPaginationParams {
+  cursor?: string;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
+interface CursorPaginationMeta {
+  nextCursor: string | null;
+  previousCursor: string | null;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  limit: number;
+}
+
+interface CursorPaginatedResponse<T> {
+  data: T[];
+  pagination: CursorPaginationMeta;
+}
+
+// Pagination utility class
+class PaginationHelper {
+  private static readonly DEFAULT_PAGE = 1;
+  private static readonly DEFAULT_LIMIT = 20;
+  private static readonly MAX_LIMIT = 100;
+  
+  static validateParams(params: PaginationParams): Required<PaginationParams> {
+    const page = Math.max(1, params.page || this.DEFAULT_PAGE);
+    const limit = Math.min(
+      this.MAX_LIMIT,
+      Math.max(1, params.limit || this.DEFAULT_LIMIT)
+    );
+    const sortBy = params.sortBy || 'createdAt';
+    const sortOrder = params.sortOrder || 'desc';
+    
+    return { page, limit, sortBy, sortOrder };
+  }
+  
+  static calculateOffset(page: number, limit: number): number {
+    return (page - 1) * limit;
+  }
+  
+  static buildMeta(
+    total: number,
+    page: number,
+    limit: number
+  ): PaginationMeta {
+    const totalPages = Math.ceil(total / limit);
+    
+    return {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNext: page < totalPages,
+      hasPrevious: page > 1,
+    };
+  }
+  
+  static buildResponse<T>(
+    data: T[],
+    total: number,
+    page: number,
+    limit: number
+  ): PaginatedResponse<T> {
+    return {
+      data,
+      pagination: this.buildMeta(total, page, limit),
+    };
+  }
+  
+  static encodeCursor(value: string | number): string {
+    return Buffer.from(String(value)).toString('base64');
+  }
+  
+  static decodeCursor(cursor: string): string {
+    return Buffer.from(cursor, 'base64').toString('utf-8');
+  }
+}
+
+// Repository pagination support
+interface IUserRepository {
+  findPaginated(params: {
+    page: number;
+    limit: number;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    filters?: Record<string, any>;
+  }): Promise<{ users: User[]; total: number }>;
+  
+  findCursorPaginated(params: {
+    cursor?: string;
+    limit: number;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    filters?: Record<string, any>;
+  }): Promise<{ users: User[]; nextCursor: string | null }>;
+}
+
+// Service layer pagination
+class UserService {
+  async listUsers(params: PaginationParams): Promise<PaginatedResponse<User>> {
+    const validated = PaginationHelper.validateParams(params);
+    
+    const { users, total } = await this.userRepository.findPaginated({
+      page: validated.page,
+      limit: validated.limit,
+      sortBy: validated.sortBy,
+      sortOrder: validated.sortOrder,
+    });
+    
+    return PaginationHelper.buildResponse(
+      users,
+      total,
+      validated.page,
+      validated.limit
+    );
+  }
+}
+
+// Controller usage
+class AdminController extends BaseController {
+  async listUsers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const params = request.query as PaginationParams;
+    
+    const result = await this.userService.listUsers(params);
+    
+    // Serialize users
+    const serialized = {
+      data: result.data.map(user => this.userSerializer.toAdmin(user)),
+      pagination: result.pagination,
+    };
+    
+    return this.sendSuccess(reply, serialized);
+  }
+}
+```
+
+### Pagination Query Parameters
+
+**Offset-Based:**
+- `page` - Page number (default: 1, min: 1)
+- `limit` - Items per page (default: 20, min: 1, max: 100)
+- `sortBy` - Field to sort by (default: 'createdAt')
+- `sortOrder` - Sort direction: 'asc' or 'desc' (default: 'desc')
+
+**Cursor-Based:**
+- `cursor` - Opaque cursor for position (optional)
+- `limit` - Items to return (default: 20, min: 1, max: 100)
+- `sortBy` - Field to sort by (default: 'createdAt')
+- `sortOrder` - Sort direction: 'asc' or 'desc' (default: 'desc')
+
+### Endpoints with Pagination
+
+- `GET /api/v1/admin/users` - List all users
+- `GET /api/v1/admin/audit-logs` - List audit logs
+- `GET /api/v1/sessions` - List user sessions
+- `GET /api/v1/devices` - List user devices
+- `GET /api/v1/webhooks` - List webhooks
+- `GET /api/v1/webhooks/:id/deliveries` - List webhook deliveries
+
+
+
+## Serializer/DTO Pattern
+
+### Purpose
+
+Serializers transform domain entities into Data Transfer Objects (DTOs) for API responses, providing:
+- **Security**: Hide sensitive fields (passwords, secrets, internal IDs)
+- **Decoupling**: Separate internal structure from API contract
+- **Flexibility**: Different views for different user roles
+- **Consistency**: Standardized response formats
+
+### Serializer Architecture
+
+```typescript
+// Base DTO types
+interface BaseDTO {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// User DTOs
+interface PublicUserDTO extends BaseDTO {
+  email: string;
+  name: string;
+  image: string | null;
+  emailVerified: boolean;
+  mfaEnabled: boolean;
+}
+
+interface AdminUserDTO extends PublicUserDTO {
+  emailVerifiedAt: string | null;
+  accountLocked: boolean;
+  failedLoginAttempts: number;
+  lastLoginAt: string | null;
+  deletedAt: string | null;
+}
+
+interface UserProfileDTO extends PublicUserDTO {
+  // Additional fields for own profile
+}
+
+// Session DTOs
+interface SessionDTO extends BaseDTO {
+  deviceName: string;
+  deviceFingerprint: string;
+  ipAddress: string;
+  location: string | null;
+  isTrusted: boolean;
+  trustScore: number;
+  lastActivityAt: string;
+  expiresAt: string;
+}
+
+// Role DTOs
+interface RoleDTO extends BaseDTO {
+  name: string;
+  description: string;
+  isSystem: boolean;
+  permissions: PermissionDTO[];
+}
+
+interface PermissionDTO {
+  id: string;
+  resource: string;
+  action: string;
+  description: string;
+}
+
+// Serializer classes
+class UserSerializer {
+  /**
+   * Serialize user for public API responses
+   * Excludes: passwordHash, mfaSecret, mfaBackupCodes, internal flags
+   */
+  static toPublic(user: User): PublicUserDTO {
+    return {
+      id: user.id,
+      email: user.email.toString(),
+      name: user.name,
+      image: user.image,
+      emailVerified: user.emailVerified,
+      mfaEnabled: user.mfaEnabled,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+  }
+  
+  /**
+   * Serialize user for admin view
+   * Includes additional fields for administration
+   */
+  static toAdmin(user: User): AdminUserDTO {
+    return {
+      ...this.toPublic(user),
+      emailVerifiedAt: user.emailVerifiedAt?.toISOString() || null,
+      accountLocked: user.accountLocked,
+      failedLoginAttempts: user.failedLoginAttempts,
+      lastLoginAt: user.lastLoginAt?.toISOString() || null,
+      deletedAt: user.deletedAt?.toISOString() || null,
+    };
+  }
+  
+  /**
+   * Serialize user's own profile
+   * Includes fields user can see about themselves
+   */
+  static toProfile(user: User): UserProfileDTO {
+    return this.toPublic(user);
+  }
+  
+  /**
+   * Serialize array of users
+   */
+  static toPublicList(users: User[]): PublicUserDTO[] {
+    return users.map(user => this.toPublic(user));
+  }
+  
+  static toAdminList(users: User[]): AdminUserDTO[] {
+    return users.map(user => this.toAdmin(user));
+  }
+}
+
+class SessionSerializer {
+  static toDTO(session: Session): SessionDTO {
+    return {
+      id: session.id,
+      deviceName: session.deviceName,
+      deviceFingerprint: session.deviceFingerprint.toString(),
+      ipAddress: session.ipAddress.toString(),
+      location: session.location,
+      isTrusted: session.isTrusted,
+      trustScore: session.trustScore,
+      lastActivityAt: session.lastActivityAt.toISOString(),
+      expiresAt: session.expiresAt.toISOString(),
+      createdAt: session.createdAt.toISOString(),
+      updatedAt: session.createdAt.toISOString(), // Sessions don't update
+    };
+  }
+  
+  static toList(sessions: Session[]): SessionDTO[] {
+    return sessions.map(session => this.toDTO(session));
+  }
+}
+
+class RoleSerializer {
+  static toDTO(role: Role): RoleDTO {
+    return {
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      isSystem: role.isSystem,
+      permissions: role.permissions.map(p => PermissionSerializer.toDTO(p)),
+      createdAt: role.createdAt.toISOString(),
+      updatedAt: role.updatedAt.toISOString(),
+    };
+  }
+  
+  static toList(roles: Role[]): RoleDTO[] {
+    return roles.map(role => this.toDTO(role));
+  }
+}
+
+class PermissionSerializer {
+  static toDTO(permission: Permission): PermissionDTO {
+    return {
+      id: permission.id,
+      resource: permission.resource,
+      action: permission.action,
+      description: permission.description,
+    };
+  }
+  
+  static toList(permissions: Permission[]): PermissionDTO[] {
+    return permissions.map(p => this.toDTO(p));
+  }
+}
+
+class DeviceSerializer {
+  static toDTO(device: Device): DeviceDTO {
+    return {
+      id: device.id,
+      fingerprint: device.fingerprint.toString(),
+      name: device.name,
+      type: device.type,
+      isTrusted: device.isTrusted,
+      lastSeenAt: device.lastSeenAt.toISOString(),
+      createdAt: device.createdAt.toISOString(),
+    };
+  }
+  
+  static toList(devices: Device[]): DeviceDTO[] {
+    return devices.map(device => this.toDTO(device));
+  }
+}
+
+class AuditLogSerializer {
+  static toDTO(log: AuditLog): AuditLogDTO {
+    return {
+      id: log.id,
+      userId: log.userId,
+      action: log.action,
+      resource: log.resource,
+      resourceId: log.resourceId,
+      status: log.status,
+      ipAddress: log.ipAddress?.toString() || null,
+      userAgent: log.userAgent,
+      metadata: log.metadata,
+      riskScore: log.riskScore,
+      createdAt: log.createdAt.toISOString(),
+    };
+  }
+  
+  static toList(logs: AuditLog[]): AuditLogDTO[] {
+    return logs.map(log => this.toDTO(log));
+  }
+}
+```
+
+### Serializer Organization
+
+```
+src/api/common/serializers/
+├── base.serializer.ts           # Base serializer utilities
+├── user.serializer.ts           # User serialization
+├── session.serializer.ts        # Session serialization
+├── role.serializer.ts           # Role serialization
+├── permission.serializer.ts     # Permission serialization
+├── device.serializer.ts         # Device serialization
+├── audit-log.serializer.ts      # Audit log serialization
+├── webhook.serializer.ts        # Webhook serialization
+├── oauth-account.serializer.ts  # OAuth account serialization
+└── index.ts                     # Export all serializers
+```
+
+### Usage in Controllers
+
+```typescript
+class UserController extends BaseController {
+  constructor(
+    private readonly userService: IUserService,
+    private readonly userSerializer: typeof UserSerializer
+  ) {
+    super();
+  }
+  
+  async getProfile(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const userId = this.getUserId(request as AuthenticatedRequest);
+    const user = await this.userService.getUserById(userId);
+    
+    // Serialize before sending
+    const response = this.userSerializer.toProfile(user);
+    
+    return this.sendSuccess(reply, { user: response });
+  }
+  
+  async updateProfile(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const userId = this.getUserId(request as AuthenticatedRequest);
+    const { name, image } = request.body as UpdateProfileRequest;
+    
+    const user = await this.userService.updateProfile(userId, { name, image });
+    
+    // Serialize before sending
+    const response = this.userSerializer.toProfile(user);
+    
+    return this.sendSuccess(reply, { user: response });
+  }
+}
+
+class AdminController extends BaseController {
+  async listUsers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const params = request.query as PaginationParams;
+    const result = await this.userService.listUsers(params);
+    
+    // Serialize with admin view
+    const response = {
+      data: this.userSerializer.toAdminList(result.data),
+      pagination: result.pagination,
+    };
+    
+    return this.sendSuccess(reply, response);
+  }
+}
+```
+
+### Serialization Rules
+
+**Always Exclude:**
+- Password hashes
+- MFA secrets and backup codes
+- Internal system flags
+- Encryption keys
+- Token hashes
+- Sensitive metadata
+
+**Date Formatting:**
+- Always use ISO 8601 format (`.toISOString()`)
+- Include timezone information
+- Consistent format across all endpoints
+
+**Value Objects:**
+- Extract primitive values (Email → string, IPAddress → string)
+- Don't expose internal value object structure
+
+**Nested Entities:**
+- Apply serialization recursively
+- Avoid circular references
+- Consider performance for deep nesting
+
+**Null Handling:**
+- Use `null` for absent optional fields
+- Don't omit fields (consistent response shape)
+- Document which fields can be null
+
+
+
+## Admin API Specifications
+
+### Admin Endpoints Overview
+
+All admin endpoints require authentication and admin role. They are prefixed with `/api/v1/admin`.
+
+### User Management Endpoints
+
+```typescript
+// GET /api/v1/admin/users - List all users with pagination
+interface ListUsersQuery extends PaginationParams {
+  email?: string;          // Filter by email (partial match)
+  status?: 'active' | 'locked' | 'deleted';
+  role?: string;           // Filter by role name
+  emailVerified?: boolean;
+  mfaEnabled?: boolean;
+}
+
+interface ListUsersResponse {
+  data: AdminUserDTO[];
+  pagination: PaginationMeta;
+}
+
+// GET /api/v1/admin/users/:id - Get user details
+interface GetUserResponse {
+  user: AdminUserDTO;
+  roles: RoleDTO[];
+  sessions: SessionDTO[];
+  devices: DeviceDTO[];
+  recentAuditLogs: AuditLogDTO[];
+}
+
+// PUT /api/v1/admin/users/:id/lock - Lock user account
+interface LockUserRequest {
+  reason: string;
+  duration?: number; // Minutes, omit for permanent
+}
+
+interface LockUserResponse {
+  message: string;
+  user: AdminUserDTO;
+}
+
+// PUT /api/v1/admin/users/:id/unlock - Unlock user account
+interface UnlockUserResponse {
+  message: string;
+  user: AdminUserDTO;
+}
+
+// POST /api/v1/admin/users/:id/roles - Assign role to user
+interface AssignRoleRequest {
+  roleId: string;
+}
+
+interface AssignRoleResponse {
+  message: string;
+  user: AdminUserDTO;
+  roles: RoleDTO[];
+}
+
+// DELETE /api/v1/admin/users/:id/roles/:roleId - Remove role from user
+interface RemoveRoleResponse {
+  message: string;
+  user: AdminUserDTO;
+  roles: RoleDTO[];
+}
+
+// DELETE /api/v1/admin/users/:id - Delete user (soft delete)
+interface DeleteUserResponse {
+  message: string;
+}
+```
+
+### Role Management Endpoints
+
+```typescript
+// GET /api/v1/admin/roles - List all roles
+interface ListRolesQuery extends PaginationParams {
+  name?: string;
+  isSystem?: boolean;
+}
+
+interface ListRolesResponse {
+  data: RoleDTO[];
+  pagination: PaginationMeta;
+}
+
+// GET /api/v1/admin/roles/:id - Get role details
+interface GetRoleResponse {
+  role: RoleDTO;
+  userCount: number;
+}
+
+// POST /api/v1/admin/roles - Create new role
+interface CreateRoleRequest {
+  name: string;
+  description: string;
+  permissionIds: string[];
+}
+
+interface CreateRoleResponse {
+  role: RoleDTO;
+}
+
+// PUT /api/v1/admin/roles/:id - Update role
+interface UpdateRoleRequest {
+  name?: string;
+  description?: string;
+  permissionIds?: string[];
+}
+
+interface UpdateRoleResponse {
+  role: RoleDTO;
+}
+
+// DELETE /api/v1/admin/roles/:id - Delete role (if not system role)
+interface DeleteRoleResponse {
+  message: string;
+}
+```
+
+### Permission Management Endpoints
+
+```typescript
+// GET /api/v1/admin/permissions - List all permissions
+interface ListPermissionsQuery extends PaginationParams {
+  resource?: string;
+  action?: string;
+}
+
+interface ListPermissionsResponse {
+  data: PermissionDTO[];
+  pagination: PaginationMeta;
+}
+
+// POST /api/v1/admin/permissions - Create new permission
+interface CreatePermissionRequest {
+  resource: string;
+  action: string;
+  description: string;
+}
+
+interface CreatePermissionResponse {
+  permission: PermissionDTO;
+}
+```
+
+### Audit Log Endpoints
+
+```typescript
+// GET /api/v1/admin/audit-logs - Query audit logs
+interface ListAuditLogsQuery extends PaginationParams {
+  userId?: string;
+  action?: string;
+  resource?: string;
+  status?: 'success' | 'failure';
+  riskScoreMin?: number;
+  riskScoreMax?: number;
+  startDate?: string; // ISO 8601
+  endDate?: string;   // ISO 8601
+}
+
+interface ListAuditLogsResponse {
+  data: AuditLogDTO[];
+  pagination: PaginationMeta;
+  statistics: {
+    totalEvents: number;
+    successCount: number;
+    failureCount: number;
+    averageRiskScore: number;
+    highRiskCount: number;
+  };
+}
+
+// GET /api/v1/admin/audit-logs/:id - Get audit log details
+interface GetAuditLogResponse {
+  log: AuditLogDTO;
+  relatedLogs: AuditLogDTO[];
+}
+```
+
+### Session Management Endpoints
+
+```typescript
+// GET /api/v1/admin/sessions - List all active sessions
+interface ListAllSessionsQuery extends PaginationParams {
+  userId?: string;
+  deviceName?: string;
+  ipAddress?: string;
+  isTrusted?: boolean;
+}
+
+interface ListAllSessionsResponse {
+  data: (SessionDTO & { user: PublicUserDTO })[];
+  pagination: PaginationMeta;
+  statistics: {
+    totalActiveSessions: number;
+    trustedSessions: number;
+    untrustedSessions: number;
+  };
+}
+
+// DELETE /api/v1/admin/sessions/:id - Revoke any session
+interface RevokeSessionResponse {
+  message: string;
+}
+
+// DELETE /api/v1/admin/sessions/user/:userId - Revoke all sessions for user
+interface RevokeUserSessionsResponse {
+  message: string;
+  revokedCount: number;
+}
+```
+
+### Webhook Management Endpoints
+
+```typescript
+// GET /api/v1/admin/webhooks - List all webhooks
+interface ListAllWebhooksQuery extends PaginationParams {
+  userId?: string;
+  isActive?: boolean;
+}
+
+interface ListAllWebhooksResponse {
+  data: (WebhookDTO & { user: PublicUserDTO })[];
+  pagination: PaginationMeta;
+}
+
+// GET /api/v1/admin/webhooks/:id/deliveries - View webhook deliveries
+interface ListWebhookDeliveriesQuery extends PaginationParams {
+  status?: 'pending' | 'delivered' | 'failed';
+  eventType?: string;
+}
+
+interface ListWebhookDeliveriesResponse {
+  data: WebhookDeliveryDTO[];
+  pagination: PaginationMeta;
+}
+```
+
+### System Metrics Endpoints
+
+```typescript
+// GET /api/v1/admin/metrics/overview - System overview metrics
+interface SystemMetricsResponse {
+  users: {
+    total: number;
+    active: number;
+    locked: number;
+    deleted: number;
+    withMFA: number;
+    emailVerified: number;
+  };
+  sessions: {
+    active: number;
+    trusted: number;
+    untrusted: number;
+  };
+  security: {
+    failedLoginAttempts24h: number;
+    accountLockouts24h: number;
+    highRiskEvents24h: number;
+    passwordResets24h: number;
+  };
+  performance: {
+    avgAuthenticationTime: number;
+    avgAuthorizationTime: number;
+    requestsPerSecond: number;
+    errorRate: number;
+  };
+}
+
+// GET /api/v1/admin/metrics/users - User growth metrics
+interface UserMetricsQuery {
+  period: 'day' | 'week' | 'month' | 'year';
+  startDate?: string;
+  endDate?: string;
+}
+
+interface UserMetricsResponse {
+  registrations: TimeSeriesData[];
+  logins: TimeSeriesData[];
+  activeUsers: TimeSeriesData[];
+}
+
+// GET /api/v1/admin/metrics/security - Security metrics
+interface SecurityMetricsResponse {
+  failedLogins: TimeSeriesData[];
+  accountLockouts: TimeSeriesData[];
+  highRiskEvents: TimeSeriesData[];
+  mfaAdoption: {
+    enabled: number;
+    disabled: number;
+    percentage: number;
+  };
+}
+```
+
+### Admin Controller Implementation
+
+```typescript
+class AdminController extends BaseController {
+  constructor(
+    private readonly userService: IUserService,
+    private readonly roleService: IRoleService,
+    private readonly auditLogService: IAuditLogService,
+    private readonly sessionService: ISessionService,
+    private readonly metricsService: IMetricsService,
+    private readonly userSerializer: typeof UserSerializer,
+    private readonly roleSerializer: typeof RoleSerializer,
+    private readonly auditLogSerializer: typeof AuditLogSerializer,
+    private readonly sessionSerializer: typeof SessionSerializer
+  ) {
+    super();
+  }
+  
+  // User management
+  async listUsers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const query = request.query as ListUsersQuery;
+    const result = await this.userService.listUsers(query);
+    
+    const response = {
+      data: this.userSerializer.toAdminList(result.data),
+      pagination: result.pagination,
+    };
+    
+    return this.sendSuccess(reply, response);
+  }
+  
+  async getUserDetails(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { id } = request.params as { id: string };
+    
+    const [user, roles, sessions, devices, auditLogs] = await Promise.all([
+      this.userService.getUserById(id),
+      this.roleService.getUserRoles(id),
+      this.sessionService.getUserSessions(id),
+      this.deviceService.getUserDevices(id),
+      this.auditLogService.getUserRecentLogs(id, 10),
+    ]);
+    
+    const response = {
+      user: this.userSerializer.toAdmin(user),
+      roles: this.roleSerializer.toList(roles),
+      sessions: this.sessionSerializer.toList(sessions),
+      devices: this.deviceSerializer.toList(devices),
+      recentAuditLogs: this.auditLogSerializer.toList(auditLogs),
+    };
+    
+    return this.sendSuccess(reply, response);
+  }
+  
+  async lockUser(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { id } = request.params as { id: string };
+    const { reason, duration } = request.body as LockUserRequest;
+    const adminId = this.getUserId(request as AuthenticatedRequest);
+    
+    await this.userService.lockAccount(id, reason, duration);
+    
+    // Log administrative action
+    await this.auditLogService.logAdminAction(adminId, 'user.lock', id, { reason, duration });
+    
+    const user = await this.userService.getUserById(id);
+    
+    return this.sendSuccess(reply, {
+      message: 'User account locked successfully',
+      user: this.userSerializer.toAdmin(user),
+    });
+  }
+  
+  async unlockUser(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { id } = request.params as { id: string };
+    const adminId = this.getUserId(request as AuthenticatedRequest);
+    
+    await this.userService.unlockAccount(id);
+    
+    // Log administrative action
+    await this.auditLogService.logAdminAction(adminId, 'user.unlock', id);
+    
+    const user = await this.userService.getUserById(id);
+    
+    return this.sendSuccess(reply, {
+      message: 'User account unlocked successfully',
+      user: this.userSerializer.toAdmin(user),
+    });
+  }
+  
+  // Role management
+  async listRoles(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const query = request.query as ListRolesQuery;
+    const result = await this.roleService.listRoles(query);
+    
+    const response = {
+      data: this.roleSerializer.toList(result.data),
+      pagination: result.pagination,
+    };
+    
+    return this.sendSuccess(reply, response);
+  }
+  
+  async createRole(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const data = request.body as CreateRoleRequest;
+    const adminId = this.getUserId(request as AuthenticatedRequest);
+    
+    const role = await this.roleService.createRole(data);
+    
+    // Log administrative action
+    await this.auditLogService.logAdminAction(adminId, 'role.create', role.id, data);
+    
+    return this.sendCreated(reply, {
+      role: this.roleSerializer.toDTO(role),
+    });
+  }
+  
+  // Audit logs
+  async listAuditLogs(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const query = request.query as ListAuditLogsQuery;
+    const result = await this.auditLogService.queryLogs(query);
+    
+    const response = {
+      data: this.auditLogSerializer.toList(result.data),
+      pagination: result.pagination,
+      statistics: result.statistics,
+    };
+    
+    return this.sendSuccess(reply, response);
+  }
+  
+  // System metrics
+  async getSystemMetrics(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const metrics = await this.metricsService.getSystemOverview();
+    return this.sendSuccess(reply, metrics);
+  }
+}
+```
+
+
+
+## Notification Template System
+
+### Template Organization
+
+```
+src/domain/notifications/
+├── channels/
+│   ├── email.channel.ts         # Email delivery channel
+│   ├── sms.channel.ts           # SMS delivery channel
+│   └── push.channel.ts          # Push notification channel (future)
+├── providers/
+│   ├── email/
+│   │   ├── smtp.provider.ts     # SMTP email provider
+│   │   ├── sendgrid.provider.ts # SendGrid provider
+│   │   └── ses.provider.ts      # AWS SES provider
+│   └── sms/
+│       ├── twilio.provider.ts   # Twilio SMS provider
+│       └── sns.provider.ts      # AWS SNS provider
+└── templates/
+    ├── email/
+    │   ├── welcome.hbs          # Welcome email template
+    │   ├── email-verification.hbs
+    │   ├── password-reset.hbs
+    │   ├── password-changed.hbs
+    │   ├── mfa-enabled.hbs
+    │   ├── mfa-disabled.hbs
+    │   ├── new-device-login.hbs
+    │   ├── account-locked.hbs
+    │   ├── account-unlocked.hbs
+    │   └── security-alert.hbs
+    ├── sms/
+    │   ├── verification-code.txt
+    │   ├── mfa-code.txt
+    │   └── security-alert.txt
+    └── layouts/
+        ├── email-base.hbs       # Base email layout
+        └── email-styles.css     # Email styles
+```
+
+### Email Template Structure
+
+**Base Layout (email-base.hbs):**
+```handlebars
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{subject}}</title>
+  <style>
+    {{{styles}}}
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <img src="{{logoUrl}}" alt="{{appName}}" class="logo">
+    </div>
+    
+    <div class="email-body">
+      {{{body}}}
+    </div>
+    
+    <div class="email-footer">
+      <p>© {{year}} {{appName}}. All rights reserved.</p>
+      <p>
+        <a href="{{supportUrl}}">Support</a> |
+        <a href="{{privacyUrl}}">Privacy Policy</a> |
+        <a href="{{termsUrl}}">Terms of Service</a>
+      </p>
+      {{#if unsubscribeUrl}}
+      <p><a href="{{unsubscribeUrl}}">Unsubscribe</a></p>
+      {{/if}}
+    </div>
+  </div>
+</body>
+</html>
+```
+
+**Welcome Email (welcome.hbs):**
+```handlebars
+<h1>Welcome to {{appName}}, {{userName}}!</h1>
+
+<p>Thank you for creating an account. We're excited to have you on board.</p>
+
+<div class="info-box">
+  <h2>Get Started</h2>
+  <ul>
+    <li>Verify your email address to unlock all features</li>
+    <li>Set up multi-factor authentication for enhanced security</li>
+    <li>Explore our documentation and guides</li>
+  </ul>
+</div>
+
+{{#unless emailVerified}}
+<div class="action-box">
+  <p>Please verify your email address to get started:</p>
+  <a href="{{verificationUrl}}" class="button button-primary">Verify Email Address</a>
+  <p class="small">This link expires in {{expirationHours}} hours.</p>
+</div>
+{{/unless}}
+
+<p>If you have any questions, feel free to reach out to our support team.</p>
+
+<p>Best regards,<br>The {{appName}} Team</p>
+```
+
+**Email Verification (email-verification.hbs):**
+```handlebars
+<h1>Verify Your Email Address</h1>
+
+<p>Hi {{userName}},</p>
+
+<p>Please verify your email address to complete your registration and access all features.</p>
+
+<div class="action-box">
+  <a href="{{verificationUrl}}" class="button button-primary">Verify Email Address</a>
+</div>
+
+<p class="small">Or copy and paste this link into your browser:</p>
+<p class="code">{{verificationUrl}}</p>
+
+<div class="warning-box">
+  <p><strong>Security Notice:</strong></p>
+  <ul>
+    <li>This link expires in {{expirationHours}} hours</li>
+    <li>If you didn't create an account, please ignore this email</li>
+    <li>Never share this link with anyone</li>
+  </ul>
+</div>
+```
+
+**Password Reset (password-reset.hbs):**
+```handlebars
+<h1>Reset Your Password</h1>
+
+<p>Hi {{userName}},</p>
+
+<p>We received a request to reset your password. Click the button below to create a new password:</p>
+
+<div class="action-box">
+  <a href="{{resetUrl}}" class="button button-primary">Reset Password</a>
+</div>
+
+<p class="small">Or copy and paste this link into your browser:</p>
+<p class="code">{{resetUrl}}</p>
+
+<div class="warning-box">
+  <p><strong>Security Notice:</strong></p>
+  <ul>
+    <li>This link expires in {{expirationMinutes}} minutes</li>
+    <li>If you didn't request a password reset, please ignore this email</li>
+    <li>Your password will not change until you create a new one</li>
+    <li>For security, all your active sessions will be terminated after reset</li>
+  </ul>
+</div>
+
+<p>If you're having trouble, contact our support team.</p>
+```
+
+**New Device Login (new-device-login.hbs):**
+```handlebars
+<h1>New Device Login Detected</h1>
+
+<p>Hi {{userName}},</p>
+
+<p>We detected a login to your account from a new device:</p>
+
+<div class="info-box">
+  <table>
+    <tr>
+      <td><strong>Device:</strong></td>
+      <td>{{deviceName}}</td>
+    </tr>
+    <tr>
+      <td><strong>Location:</strong></td>
+      <td>{{location}}</td>
+    </tr>
+    <tr>
+      <td><strong>IP Address:</strong></td>
+      <td>{{ipAddress}}</td>
+    </tr>
+    <tr>
+      <td><strong>Time:</strong></td>
+      <td>{{loginTime}}</td>
+    </tr>
+  </table>
+</div>
+
+<p><strong>Was this you?</strong></p>
+
+<div class="action-box">
+  <a href="{{confirmUrl}}" class="button button-success">Yes, This Was Me</a>
+  <a href="{{secureAccountUrl}}" class="button button-danger">No, Secure My Account</a>
+</div>
+
+<p>If this wasn't you, we recommend:</p>
+<ul>
+  <li>Change your password immediately</li>
+  <li>Enable multi-factor authentication</li>
+  <li>Review your active sessions and revoke unknown devices</li>
+</ul>
+```
+
+**MFA Enabled (mfa-enabled.hbs):**
+```handlebars
+<h1>Multi-Factor Authentication Enabled</h1>
+
+<p>Hi {{userName}},</p>
+
+<p>Multi-factor authentication ({{mfaType}}) has been successfully enabled for your account.</p>
+
+<div class="success-box">
+  <p>✓ Your account is now more secure!</p>
+</div>
+
+<div class="info-box">
+  <h2>What This Means:</h2>
+  <ul>
+    <li>You'll need to provide a verification code when logging in</li>
+    <li>Your backup codes are stored securely - keep them safe</li>
+    <li>You can disable MFA anytime from your account settings</li>
+  </ul>
+</div>
+
+<div class="warning-box">
+  <p><strong>Important:</strong> If you lose access to your {{mfaType}} device, use your backup codes to regain access.</p>
+</div>
+
+<p>If you didn't enable MFA, please secure your account immediately.</p>
+```
+
+**Account Locked (account-locked.hbs):**
+```handlebars
+<h1>Account Locked</h1>
+
+<p>Hi {{userName}},</p>
+
+<p>Your account has been temporarily locked due to {{reason}}.</p>
+
+<div class="warning-box">
+  <table>
+    <tr>
+      <td><strong>Reason:</strong></td>
+      <td>{{reason}}</td>
+    </tr>
+    <tr>
+      <td><strong>Locked At:</strong></td>
+      <td>{{lockedAt}}</td>
+    </tr>
+    {{#if unlockAt}}
+    <tr>
+      <td><strong>Unlocks At:</strong></td>
+      <td>{{unlockAt}}</td>
+    </tr>
+    {{/if}}
+  </table>
+</div>
+
+{{#if isTemporary}}
+<p>Your account will automatically unlock at {{unlockAt}}.</p>
+{{else}}
+<p>Please contact support to unlock your account.</p>
+<div class="action-box">
+  <a href="{{supportUrl}}" class="button button-primary">Contact Support</a>
+</div>
+{{/if}}
+
+<p>If you believe this was a mistake, please contact our support team.</p>
+```
+
+### SMS Templates
+
+**Verification Code (verification-code.txt):**
+```
+{{appName}}: Your verification code is {{code}}. Valid for {{expirationMinutes}} minutes. Never share this code.
+```
+
+**MFA Code (mfa-code.txt):**
+```
+{{appName}}: Your login code is {{code}}. If you didn't request this, secure your account immediately.
+```
+
+**Security Alert (security-alert.txt):**
+```
+{{appName}} Security Alert: {{message}}. If this wasn't you, change your password immediately.
+```
+
+### Template Rendering Service
+
+```typescript
+interface TemplateContext {
+  [key: string]: any;
+}
+
+interface EmailTemplate {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+class TemplateService {
+  private handlebars: typeof Handlebars;
+  private templateCache: Map<string, HandlebarsTemplateDelegate>;
+  
+  constructor() {
+    this.handlebars = Handlebars.create();
+    this.templateCache = new Map();
+    this.registerHelpers();
+  }
+  
+  private registerHelpers(): void {
+    // Date formatting helper
+    this.handlebars.registerHelper('formatDate', (date: Date, format: string) => {
+      return new Intl.DateTimeFormat('en-US', {
+        dateStyle: format === 'short' ? 'short' : 'long',
+        timeStyle: format === 'short' ? 'short' : 'long',
+      }).format(date);
+    });
+    
+    // Conditional helpers
+    this.handlebars.registerHelper('eq', (a, b) => a === b);
+    this.handlebars.registerHelper('ne', (a, b) => a !== b);
+    this.handlebars.registerHelper('gt', (a, b) => a > b);
+    this.handlebars.registerHelper('lt', (a, b) => a < b);
+  }
+  
+  async renderEmail(
+    templateName: string,
+    context: TemplateContext
+  ): Promise<EmailTemplate> {
+    const template = await this.loadTemplate(`email/${templateName}`);
+    const layout = await this.loadTemplate('layouts/email-base');
+    const styles = await this.loadStyles('layouts/email-styles.css');
+    
+    // Render template body
+    const body = template(context);
+    
+    // Render with layout
+    const html = layout({
+      ...context,
+      body,
+      styles,
+      year: new Date().getFullYear(),
+    });
+    
+    // Generate plain text version
+    const text = this.htmlToText(html);
+    
+    return {
+      subject: context.subject || templateName,
+      html,
+      text,
+    };
+  }
+  
+  async renderSMS(
+    templateName: string,
+    context: TemplateContext
+  ): Promise<string> {
+    const template = await this.loadTemplate(`sms/${templateName}`);
+    return template(context);
+  }
+  
+  private async loadTemplate(path: string): Promise<HandlebarsTemplateDelegate> {
+    if (this.templateCache.has(path)) {
+      return this.templateCache.get(path)!;
+    }
+    
+    const templatePath = `./src/domain/notifications/templates/${path}.hbs`;
+    const source = await fs.readFile(templatePath, 'utf-8');
+    const template = this.handlebars.compile(source);
+    
+    this.templateCache.set(path, template);
+    return template;
+  }
+  
+  private async loadStyles(path: string): Promise<string> {
+    const stylesPath = `./src/domain/notifications/templates/${path}`;
+    return await fs.readFile(stylesPath, 'utf-8');
+  }
+  
+  private htmlToText(html: string): string {
+    // Simple HTML to text conversion
+    return html
+      .replace(/<style[^>]*>.*?<\/style>/gs, '')
+      .replace(/<script[^>]*>.*?<\/script>/gs, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+}
+```
+
+### Email Service Integration
+
+```typescript
+class EmailService implements IEmailService {
+  constructor(
+    private readonly templateService: TemplateService,
+    private readonly emailProvider: IEmailProvider
+  ) {}
+  
+  async sendWelcomeEmail(user: User, verificationUrl: string): Promise<void> {
+    const email = await this.templateService.renderEmail('welcome', {
+      subject: `Welcome to ${env.APP_NAME}!`,
+      userName: user.name,
+      appName: env.APP_NAME,
+      emailVerified: user.emailVerified,
+      verificationUrl,
+      expirationHours: 24,
+      logoUrl: env.LOGO_URL,
+      supportUrl: env.SUPPORT_URL,
+      privacyUrl: env.PRIVACY_URL,
+      termsUrl: env.TERMS_URL,
+    });
+    
+    await this.emailProvider.send({
+      to: user.email.toString(),
+      from: env.EMAIL_FROM,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+  }
+  
+  async sendEmailVerification(user: User, verificationUrl: string): Promise<void> {
+    const email = await this.templateService.renderEmail('email-verification', {
+      subject: 'Verify Your Email Address',
+      userName: user.name,
+      appName: env.APP_NAME,
+      verificationUrl,
+      expirationHours: 24,
+      logoUrl: env.LOGO_URL,
+      supportUrl: env.SUPPORT_URL,
+    });
+    
+    await this.emailProvider.send({
+      to: user.email.toString(),
+      from: env.EMAIL_FROM,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+  }
+  
+  async sendPasswordReset(user: User, resetUrl: string): Promise<void> {
+    const email = await this.templateService.renderEmail('password-reset', {
+      subject: 'Reset Your Password',
+      userName: user.name,
+      appName: env.APP_NAME,
+      resetUrl,
+      expirationMinutes: 60,
+      logoUrl: env.LOGO_URL,
+      supportUrl: env.SUPPORT_URL,
+    });
+    
+    await this.emailProvider.send({
+      to: user.email.toString(),
+      from: env.EMAIL_FROM,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+  }
+  
+  async sendNewDeviceAlert(
+    user: User,
+    device: Device,
+    location: string | null,
+    ipAddress: string
+  ): Promise<void> {
+    const email = await this.templateService.renderEmail('new-device-login', {
+      subject: 'New Device Login Detected',
+      userName: user.name,
+      appName: env.APP_NAME,
+      deviceName: device.name,
+      location: location || 'Unknown',
+      ipAddress,
+      loginTime: new Date().toLocaleString(),
+      confirmUrl: `${env.APP_URL}/devices/${device.id}/confirm`,
+      secureAccountUrl: `${env.APP_URL}/security/secure-account`,
+      logoUrl: env.LOGO_URL,
+      supportUrl: env.SUPPORT_URL,
+    });
+    
+    await this.emailProvider.send({
+      to: user.email.toString(),
+      from: env.EMAIL_FROM,
+      subject: email.subject,
+      html: email.html,
+      text: email.text,
+    });
+  }
+}
+```
+
