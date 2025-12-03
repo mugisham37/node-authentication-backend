@@ -32,14 +32,15 @@ export class RoleRepository implements IRoleRepository {
     try {
       const result = await this.db.select().from(roles).where(eq(roles.id, id)).limit(1);
 
-      if (result.length === 0) {
+      const role = result[0];
+      if (!role) {
         return null;
       }
 
       // Load permissions for the role
       const rolePermissions = await this.getPermissions(id);
 
-      return this.mapToEntity(result[0], rolePermissions);
+      return this.mapToEntity(role, rolePermissions);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -60,9 +61,14 @@ export class RoleRepository implements IRoleRepository {
       }
 
       // Load permissions for the role
-      const rolePerms = await this.getPermissions(result[0].id);
+      const firstRole = result[0];
+      if (!firstRole) {
+        return null;
+      }
 
-      return this.mapToEntity(result[0], rolePerms);
+      const rolePerms = await this.getPermissions(firstRole.id);
+
+      return this.mapToEntity(firstRole, rolePerms);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -385,7 +391,7 @@ export class RoleRepository implements IRoleRepository {
     return new Role({
       id: row.id,
       name: row.name,
-      description: row.description || undefined,
+      description: row.description || '',
       isSystem: row.isSystem,
       permissions,
       createdAt: row.createdAt,

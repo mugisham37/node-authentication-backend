@@ -249,7 +249,7 @@ export class AuthenticationService implements IAuthenticationService {
 
     // Create initial session for the user
     const sessionId = randomUUID();
-    
+
     // Generate tokens
     const tokens = this.tokenService.generateTokens(
       savedUser.id,
@@ -574,7 +574,9 @@ export class AuthenticationService implements IAuthenticationService {
    * Refresh access and refresh tokens
    * Requirements: 7.2
    */
-  async refreshTokens(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+  async refreshTokens(
+    refreshToken: string
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     // Verify the refresh token
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
 
@@ -610,4 +612,3 @@ export class AuthenticationService implements IAuthenticationService {
     };
   }
 }
-

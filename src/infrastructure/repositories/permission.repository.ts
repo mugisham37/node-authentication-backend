@@ -32,11 +32,12 @@ export class PermissionRepository implements IPermissionRepository {
         .where(eq(permissions.id, id))
         .limit(1);
 
-      if (result.length === 0) {
+      const permission = result[0];
+      if (!permission) {
         return null;
       }
 
-      return this.mapToEntity(result[0]);
+      return this.mapToEntity(permission);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -57,11 +58,12 @@ export class PermissionRepository implements IPermissionRepository {
         .where(and(eq(permissions.resource, resource), eq(permissions.action, action)))
         .limit(1);
 
-      if (result.length === 0) {
+      const permission = result[0];
+      if (!permission) {
         return null;
       }
 
-      return this.mapToEntity(result[0]);
+      return this.mapToEntity(permission);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,

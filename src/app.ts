@@ -1,3 +1,4 @@
+/* cSpell:ignore clickjacking frameguard hsts passwordless */
 import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
@@ -17,6 +18,7 @@ export interface AppOptions {
   logger?: boolean;
 }
 
+// eslint-disable-next-line max-lines-per-function
 export async function buildApp(options: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: options.logger !== false,
@@ -202,6 +204,7 @@ export async function buildApp(options: AppOptions = {}): Promise<FastifyInstanc
   });
 
   // Global error handler
+  // eslint-disable-next-line max-lines-per-function
   app.setErrorHandler(async (error: Error, request: FastifyRequest, reply: FastifyReply) => {
     const requestId = request.id;
     const userId = (request as FastifyRequest & { user?: { id?: string } }).user?.id;

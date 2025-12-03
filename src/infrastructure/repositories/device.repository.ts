@@ -74,11 +74,12 @@ export class DeviceRepository implements IDeviceRepository {
     try {
       const result = await this.db.select().from(devices).where(eq(devices.id, id)).limit(1);
 
-      if (result.length === 0) {
+      const device = result[0];
+      if (!device) {
         return null;
       }
 
-      return this.mapToEntity(result[0]);
+      return this.mapToEntity(device);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -99,11 +100,12 @@ export class DeviceRepository implements IDeviceRepository {
         .where(eq(devices.deviceId, fingerprint))
         .limit(1);
 
-      if (result.length === 0) {
+      const device = result[0];
+      if (!device) {
         return null;
       }
 
-      return this.mapToEntity(result[0]);
+      return this.mapToEntity(device);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,

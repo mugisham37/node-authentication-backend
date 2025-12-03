@@ -1,6 +1,6 @@
 import { eq, and, isNull } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { IUserRepository } from '../../domain/repositories/user.repository.js';
+import { IUserRepository } from '../../domain/repositories/user.repository.interface.js';
 import { User } from '../../domain/entities/user.entity.js';
 import { Email } from '../../domain/value-objects/email.value-object.js';
 import { users, type User as UserRow } from '../database/schema/users.schema.js';
@@ -29,11 +29,12 @@ export class UserRepository implements IUserRepository {
         .where(and(eq(users.id, id), isNull(users.deletedAt)))
         .limit(1);
 
-      if (result.length === 0) {
+      const user = result[0];
+      if (!user) {
         return null;
       }
 
-      return this.mapToEntity(result[0]);
+      return this.mapToEntity(user);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -56,11 +57,12 @@ export class UserRepository implements IUserRepository {
         .where(and(eq(users.email, normalizedEmail), isNull(users.deletedAt)))
         .limit(1);
 
-      if (result.length === 0) {
+      const user = result[0];
+      if (!user) {
         return null;
       }
 
-      return this.mapToEntity(result[0]);
+      return this.mapToEntity(user);
     } catch (error) {
       throw new ServiceUnavailableError('Database', {
         originalError: (error as Error).message,
@@ -110,22 +112,25 @@ export class UserRepository implements IUserRepository {
    */
   async save(user: User): Promise<User> {
     try {
+      const nameParts = user.name.split(' ');
       const result = await this.db
         .insert(users)
         .values({
           id: user.id,
           email: user.email.toString(),
           passwordHash: user.passwordHash,
-          name: user.name,
-          image: user.image,
-          emailVerified: user.emailVerified,
-          emailVerifiedAt: user.emailVerifiedAt,
-          mfaEnabled: user.mfaEnabled,
-          mfaSecret: user.mfaSecret,
-          mfaBackupCodes: user.mfaBackupCodes,
-          accountLocked: user.accountLocked,
-          failedLoginAttempts: user.failedLoginAttempts,
+          username: null,
+          firstName: nameParts[0] || null,
+          lastName: nameParts.slice(1).join(' ') || null,
+          phoneNumber: null,
+          isEmailVerified: user.emailVerified,
+          isPhoneVerified: false,
+          isActive: !user.isDeleted(),
+          isSuspended: user.accountLocked,
           lastLoginAt: user.lastLoginAt,
+          lastLoginIp: null,
+          failedLoginAttempts: user.failedLoginAttempts.toString(),
+          lockoutUntil: user.accountLockedUntil,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
           deletedAt: user.deletedAt,
@@ -142,26 +147,27 @@ export class UserRepository implements IUserRepository {
 
       return this.mapToEntity(createdUser);
     } catch (error) {
-      const err = error as { code?: string; message?: string };
-      // Handle unique constraint violation (duplicate email)
-      if (err.code === '23505') {
-        throw new ConflictError('Email already exists', {
-          email: user.email.toString(),
-        });
-      }
+      return this.handleSaveError(error, user.email.toString());
+    }
+  }
 
-      // Handle foreign key violation
-      if (err.code === '23503') {
-        throw new ConflictError('Invalid reference', {
-          originalError: err.message || 'Unknown error',
-        });
-      }
-
-      throw new ServiceUnavailableError('Database', {
+  /**
+   * Handle errors during user save operation
+   */
+  private handleSaveError(error: unknown, email: string): never {
+    const err = error as { code?: string; message?: string };
+    if (err.code === '23505') {
+      throw new ConflictError('Email already exists', { email });
+    }
+    if (err.code === '23503') {
+      throw new ConflictError('Invalid reference', {
         originalError: err.message || 'Unknown error',
-        operation: 'save',
       });
     }
+    throw new ServiceUnavailableError('Database', {
+      originalError: err.message || 'Unknown error',
+      operation: 'save',
+    });
   }
 
   /**
@@ -174,16 +180,14 @@ export class UserRepository implements IUserRepository {
         .set({
           email: user.email.toString(),
           passwordHash: user.passwordHash,
-          name: user.name,
-          image: user.image,
-          emailVerified: user.emailVerified,
-          emailVerifiedAt: user.emailVerifiedAt,
-          mfaEnabled: user.mfaEnabled,
-          mfaSecret: user.mfaSecret,
-          mfaBackupCodes: user.mfaBackupCodes,
-          accountLocked: user.accountLocked,
-          failedLoginAttempts: user.failedLoginAttempts,
+          firstName: user.name.split(' ')[0] || null,
+          lastName: user.name.split(' ').slice(1).join(' ') || null,
+          isEmailVerified: user.emailVerified,
+          isActive: !user.isDeleted(),
+          isSuspended: user.accountLocked,
           lastLoginAt: user.lastLoginAt,
+          failedLoginAttempts: user.failedLoginAttempts.toString(),
+          lockoutUntil: user.accountLockedUntil,
           updatedAt: new Date(),
           deletedAt: user.deletedAt,
         })
@@ -261,7 +265,7 @@ export class UserRepository implements IUserRepository {
     // Map database fields to entity fields
     const fullName = [row.firstName, row.lastName].filter(Boolean).join(' ') || 'Unknown User';
     const failedAttempts = parseInt(row.failedLoginAttempts || '0', 10);
-    
+
     return new User({
       id: row.id,
       email: new Email(row.email),
