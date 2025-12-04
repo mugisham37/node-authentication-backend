@@ -1,0 +1,37 @@
+<h1>🔔 New Device Login Detected</h1>
+
+<p>Hi {{name}},</p>
+
+<p>We detected a login to your account from a new device or location.</p>
+
+<div class="info-box">
+  <p><strong>Login Details:</strong></p>
+  <p>• Time: {{timestamp}}</p>
+  <p>• IP Address: {{ipAddress}}</p>
+  <p>• Location: {{location}}</p>
+  <p>• Device: {{deviceName}}</p>
+  <p>• Browser: {{userAgent}}</p>
+</div>
+
+<h2>Was This You?</h2>
+
+<p>If you recognize this login, you can safely ignore this email. Your account remains secure.</p>
+
+<p>If you'd like to trust this device for future logins, you can mark it as trusted in your security settings.</p>
+
+<a href="{{devicesUrl}}" class="email-button">Manage Devices</a>
+
+<hr class="divider">
+
+<div class="alert-box">
+  <p><strong>⚠️ Don't recognize this login?</strong></p>
+  <p>If this wasn't you, your account may be compromised. Take action immediately:</p>
+  <ul style="margin: 10px 0;">
+    <li>Change your password right away</li>
+    <li>Review and revoke suspicious sessions</li>
+    <li>Enable multi-factor authentication</li>
+    <li>Contact our security team</li>
+  </ul>
+</div>
+
+<a href="{{securityUrl}}" style="display: inline-block; margin-top: 10px;">Review Security Settings</a>

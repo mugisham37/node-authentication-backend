@@ -1,0 +1,38 @@
+<h1>🔒 Account Locked</h1>
+
+<p>Hi {{name}},</p>
+
+<p>Your account has been temporarily locked due to multiple failed login attempts.</p>
+
+<div class="warning-box">
+  <p><strong>Lock Details:</strong></p>
+  <p>• Locked at: {{timestamp}}</p>
+  <p>• Reason: {{reason}}</p>
+  <p>• Failed attempts: {{failedAttempts}}</p>
+  {{#if unlockTime}}
+  <p>• Auto-unlock at: {{unlockTime}}</p>
+  {{/if}}
+</div>
+
+<h2>What Happened?</h2>
+
+<p>We detected {{failedAttempts}} failed login attempts on your account. To protect your account from unauthorized access, we've temporarily locked it.</p>
+
+<h2>How to Unlock Your Account</h2>
+
+{{#if unlockTime}}
+<p>Your account will automatically unlock at <strong>{{unlockTime}}</strong>.</p>
+{{/if}}
+
+<p>You can also unlock your account immediately by resetting your password:</p>
+
+<a href="{{resetPasswordUrl}}" class="email-button">Reset Password</a>
+
+<hr class="divider">
+
+<div class="info-box">
+  <p><strong>Security Tip:</strong></p>
+  <p>If you've been locked out due to forgotten password, use the password reset link above. If you suspect unauthorized access attempts, please contact our security team.</p>
+</div>
+
+<a href="{{supportUrl}}" style="display: inline-block; margin-top: 10px;">Contact Support</a>

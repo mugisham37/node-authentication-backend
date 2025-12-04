@@ -1,5 +1,12 @@
 import { Twilio } from 'twilio';
-import type { ISMSService, SendSMSInput } from '../../../application/services/sms.service.js';
+import type {
+  ISMSService,
+  SendSMSInput,
+  SendVerificationCodeInput,
+  SendMFACodeInput,
+  SendSecurityAlertSMSInput,
+} from '../../../application/services/sms.service.js';
+import { TemplateService } from '../../../application/services/template.service.js';
 import { log as logger } from '../../logging/logger.js';
 
 export interface TwilioConfig {
@@ -12,10 +19,12 @@ export class SMSService implements ISMSService {
   private twilioClient: Twilio;
   private fromNumber: string;
   private maxRetries: number = 3;
+  private templateService: TemplateService;
 
-  constructor(config: TwilioConfig) {
+  constructor(config: TwilioConfig, templateService: TemplateService) {
     this.twilioClient = new Twilio(config.accountSid, config.authToken);
     this.fromNumber = config.fromNumber;
+    this.templateService = templateService;
 
     logger.info('SMS service initialized', {
       fromNumber: config.fromNumber,
@@ -70,6 +79,91 @@ export class SMSService implements ISMSService {
     );
 
     throw lastError || new Error('Failed to send SMS');
+  }
+
+  async sendVerificationCode(input: SendVerificationCodeInput): Promise<void> {
+    try {
+      const message = this.templateService.renderSMS({
+        templateName: 'verification-code',
+        data: {
+          code: input.code,
+          expiryMinutes: input.expiryMinutes,
+        },
+      });
+
+      await this.sendSMS({
+        to: input.to,
+        message,
+      });
+
+      logger.info('Verification code SMS sent', {
+        to: input.to,
+      });
+    } catch (error) {
+      logger.error('Failed to send verification code SMS', {
+        error,
+        to: input.to,
+      });
+      throw error;
+    }
+  }
+
+  async sendMFACode(input: SendMFACodeInput): Promise<void> {
+    try {
+      const message = this.templateService.renderSMS({
+        templateName: 'mfa-code',
+        data: {
+          code: input.code,
+          expiryMinutes: input.expiryMinutes,
+        },
+      });
+
+      await this.sendSMS({
+        to: input.to,
+        message,
+      });
+
+      logger.info('MFA code SMS sent', {
+        to: input.to,
+      });
+    } catch (error) {
+      logger.error('Failed to send MFA code SMS', {
+        error,
+        to: input.to,
+      });
+      throw error;
+    }
+  }
+
+  async sendSecurityAlert(input: SendSecurityAlertSMSInput): Promise<void> {
+    try {
+      const message = this.templateService.renderSMS({
+        templateName: 'security-alert',
+        data: {
+          alertType: input.alertType,
+          alertMessage: input.alertMessage,
+          timestamp: input.timestamp,
+          location: input.location,
+          securityUrl: input.securityUrl,
+        },
+      });
+
+      await this.sendSMS({
+        to: input.to,
+        message,
+      });
+
+      logger.info('Security alert SMS sent', {
+        to: input.to,
+        alertType: input.alertType,
+      });
+    } catch (error) {
+      logger.error('Failed to send security alert SMS', {
+        error,
+        to: input.to,
+      });
+      throw error;
+    }
   }
 
   validatePhoneNumber(phoneNumber: string): boolean {

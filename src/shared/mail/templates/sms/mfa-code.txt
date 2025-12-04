@@ -1,0 +1,5 @@
+Your Enterprise Auth MFA code is: {{code}}
+
+This code expires in {{expiryMinutes}} minutes.
+
+Never share this code with anyone.

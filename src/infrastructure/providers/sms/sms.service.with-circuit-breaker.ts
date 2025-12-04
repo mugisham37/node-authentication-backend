@@ -1,4 +1,10 @@
-import type { ISMSService, SendSMSInput } from '../../../application/services/sms.service.js';
+import type {
+  ISMSService,
+  SendSMSInput,
+  SendVerificationCodeInput,
+  SendMFACodeInput,
+  SendSecurityAlertSMSInput,
+} from '../../../application/services/sms.service.js';
 import { CircuitBreaker } from '../../resilience/circuit-breaker.js';
 import { log as logger } from '../../logging/logger.js';
 
@@ -21,6 +27,18 @@ export class SMSServiceWithCircuitBreaker implements ISMSService {
 
   async sendSMS(input: SendSMSInput): Promise<void> {
     return this.circuitBreaker.execute(() => this.smsService.sendSMS(input));
+  }
+
+  async sendVerificationCode(input: SendVerificationCodeInput): Promise<void> {
+    return this.circuitBreaker.execute(() => this.smsService.sendVerificationCode(input));
+  }
+
+  async sendMFACode(input: SendMFACodeInput): Promise<void> {
+    return this.circuitBreaker.execute(() => this.smsService.sendMFACode(input));
+  }
+
+  async sendSecurityAlert(input: SendSecurityAlertSMSInput): Promise<void> {
+    return this.circuitBreaker.execute(() => this.smsService.sendSecurityAlert(input));
   }
 
   validatePhoneNumber(phoneNumber: string): boolean {

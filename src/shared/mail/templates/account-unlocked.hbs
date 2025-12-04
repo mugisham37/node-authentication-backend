@@ -1,0 +1,35 @@
+<h1>✅ Account Unlocked</h1>
+
+<p>Hi {{name}},</p>
+
+<p>Good news! Your account has been unlocked and you can now log in again.</p>
+
+<div class="info-box">
+  <p><strong>Unlock Details:</strong></p>
+  <p>• Unlocked at: {{timestamp}}</p>
+  <p>• Unlocked by: {{unlockedBy}}</p>
+  {{#if reason}}
+  <p>• Reason: {{reason}}</p>
+  {{/if}}
+</div>
+
+<h2>Next Steps</h2>
+
+<p>You can now log in to your account. For your security, we recommend:</p>
+
+<ul>
+  <li>Using a strong, unique password</li>
+  <li>Enabling multi-factor authentication</li>
+  <li>Reviewing your recent account activity</li>
+</ul>
+
+<a href="{{loginUrl}}" class="email-button">Log In Now</a>
+
+<hr class="divider">
+
+<div class="warning-box">
+  <p><strong>Prevent Future Lockouts:</strong></p>
+  <p>Make sure you're using the correct password. If you're having trouble remembering it, consider using a password manager or resetting it to something memorable but secure.</p>
+</div>
+
+<a href="{{securityUrl}}" style="display: inline-block; margin-top: 10px;">Review Security Settings</a>

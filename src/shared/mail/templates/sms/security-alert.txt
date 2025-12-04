@@ -1,0 +1,10 @@
+SECURITY ALERT: {{alertType}}
+
+{{alertMessage}}
+
+Time: {{timestamp}}
+Location: {{location}}
+
+If this wasn't you, secure your account immediately at {{securityUrl}}
+
+- Enterprise Auth Security Team

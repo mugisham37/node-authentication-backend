@@ -1,0 +1,30 @@
+<h1>⚠️ Multi-Factor Authentication Disabled</h1>
+
+<p>Hi {{name}},</p>
+
+<p>Multi-factor authentication (MFA) has been disabled on your account.</p>
+
+<div class="warning-box">
+  <p><strong>Disabled Details:</strong></p>
+  <p>• Disabled at: {{timestamp}}</p>
+  <p>• IP Address: {{ipAddress}}</p>
+  <p>• Location: {{location}}</p>
+  <p>• Device: {{deviceName}}</p>
+</div>
+
+<h2>Security Notice</h2>
+
+<p>Your account is now protected only by your password. We strongly recommend keeping MFA enabled for maximum security.</p>
+
+<p>Without MFA, your account is more vulnerable to unauthorized access if your password is compromised.</p>
+
+<a href="{{mfaSetupUrl}}" class="email-button">Re-enable MFA</a>
+
+<hr class="divider">
+
+<div class="alert-box">
+  <p><strong>⚠️ Didn't disable MFA?</strong></p>
+  <p>If you didn't make this change, your account may be compromised. Please contact our security team immediately and re-enable MFA.</p>
+</div>
+
+<a href="{{supportUrl}}" style="display: inline-block; margin-top: 10px;">Contact Security Team</a>
