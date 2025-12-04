@@ -6,11 +6,11 @@ import {
   AuditLogFilters,
   AuditLogPaginationOptions,
   PaginatedAuditLogs,
-} from '../../../domain/repositories/audit-log.repository.js';
-import { AuditLog } from '../../../domain/entities/audit-log.entity.js';
-import { IPAddress } from '../../../domain/value-objects/ip-address.value-object.js';
-import { auditLogs } from '../../database/schema/audit.schema.js';
-import { ServiceUnavailableError } from '../../../shared/errors/types/application-error.js';
+} from '../../domain/repositories/audit-log.repository.js';
+import { AuditLog } from '../../domain/entities/audit-log.entity.js';
+import { IPAddress } from '../../domain/value-objects/ip-address.value-object.js';
+import { auditLogs } from '../database/schema/audit.schema.js';
+import { ServiceUnavailableError } from '../../shared/errors/types/application-error.js';
 
 type AuditLogRow = typeof auditLogs.$inferSelect;
 

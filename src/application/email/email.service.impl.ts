@@ -12,7 +12,7 @@ import type {
   AccountLockedEmailInput,
   AccountUnlockedEmailInput,
 } from '../../application/services/email.service.js';
-import { NodemailerProvider } from '../../shared/mail/providers/nodemailer-provider.js';
+import { NodemailerProvider } from '../../infrastructure/mail/providers/nodemailer-provider.js';
 import { TemplateService } from '../../application/services/template.service.js';
 import { EmailQueue } from '../../infrastructure/queue/email-queue.js';
 import { logger } from '../../infrastructure/logging/logger.js';

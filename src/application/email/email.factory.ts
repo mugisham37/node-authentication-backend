@@ -3,7 +3,7 @@ import { EmailService } from './email.service.impl.js';
 import {
   NodemailerProvider,
   NodemailerConfig,
-} from '../../shared/mail/providers/nodemailer-provider.js';
+} from '../../infrastructure/mail/providers/nodemailer-provider.js';
 import { TemplateService } from '../services/template.service.js';
 import { EmailQueue } from '../../infrastructure/queue/email-queue.js';
 import { logger } from '../../infrastructure/logging/logger.js';

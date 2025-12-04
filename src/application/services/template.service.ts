@@ -93,7 +93,7 @@ export class TemplateService {
   }
 
   private loadTemplates(): void {
-    const templatesDir = join(__dirname, '../../shared/mail/templates');
+    const templatesDir = join(__dirname, '../../infrastructure/mail/templates');
 
     // Load base layout
     try {

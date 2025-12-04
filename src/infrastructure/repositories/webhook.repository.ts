@@ -5,8 +5,8 @@ import {
   WebhookDelivery,
   WebhookPaginationOptions,
   PaginatedWebhooks,
-} from './webhook.repository.interface.js';
-import { Webhook } from '../entities/webhook.entity.js';
+} from '../../domain/repositories/webhook.repository.interface.js';
+import { Webhook } from '../../domain/entities/webhook.entity.js';
 import {
   webhooks,
   webhookDeliveries,

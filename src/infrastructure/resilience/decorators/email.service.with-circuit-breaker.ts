@@ -5,9 +5,9 @@ import type {
   PasswordResetEmailInput,
   SecurityAlertEmailInput,
   WelcomeEmailInput,
-} from '../../application/services/email.service.js';
-import { CircuitBreaker } from '../../infrastructure/resilience/circuit-breaker.js';
-import { logger } from '../../infrastructure/logging/logger.js';
+} from '../../../application/services/email.service.js';
+import { CircuitBreaker } from '../circuit-breaker.js';
+import { logger } from '../../logging/logger.js';
 
 /**
  * Email service wrapper with circuit breaker protection

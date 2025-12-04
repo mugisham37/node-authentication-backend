@@ -1,1 +1,1 @@
-export { WebhookRepository } from './webhook.repository.impl.js';
+export type { IWebhookRepository, WebhookDelivery, WebhookPaginationOptions, PaginatedWebhooks } from './webhook.repository.interface.js';
